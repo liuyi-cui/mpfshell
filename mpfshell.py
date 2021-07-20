@@ -256,6 +256,11 @@ class MpFileShell(cmd.Cmd):
 
         self.__disconnect()
 
+    def __sort_files(self, file_):
+        if isinstance(file_, tuple):
+            return file_[1]
+        return file_
+
     def do_ls(self, args):
         """ls
         List remote files.
@@ -264,6 +269,7 @@ class MpFileShell(cmd.Cmd):
         if self.__is_open():
             try:
                 files = self.fe.ls(add_details=True)
+                files.sort(key=self.__sort_files)
 
                 if self.fe.pwd() != "/":
                     files = [("..", "D")] + files
@@ -271,10 +277,10 @@ class MpFileShell(cmd.Cmd):
                 print("\nRemote files in '%s':\n" % self.fe.pwd())
 
                 for elem, type in files:
-                    if type == 'F':
-                        print("       %s" % elem)
-                    else:
+                    if type == 'D':
                         print(" <dir> %s" % elem)
+                    else:
+                        print(" <file/empty_dir> %s" % elem)
 
                 print("")
 
@@ -836,7 +842,7 @@ def main():
 
     args = parser.parse_args()
 
-    format = '%(asctime)s\t%(levelname)s\t%(message)s'
+    format='%(asctime)s %(thread)d %(threadName)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 
     if args.logfile is not None:
         logging.basicConfig(format=format, filename=args.logfile, level=args.loglevel)

@@ -148,6 +148,8 @@ class Pyboard:
 
     def eval(self, expression):
         ret = self.exec_('print({})'.format(expression))
+        if 'uos' in expression:
+            ret = ret.decode('utf-8').replace('\r\n0', '').encode('utf-8')
         ret = ret.strip()
         return ret
 

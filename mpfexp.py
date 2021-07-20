@@ -67,7 +67,7 @@ class MpFileExplorer(Pyboard):
     BIN_CHUNK_SIZE = 64 * 100
     MAX_TRIES = 3
 
-    def __init__(self, constr, reset=False):
+    def __init__(self, constr, reset=False, os_lib='os'):
         """
         Supports the following connection strings.
 
@@ -79,6 +79,7 @@ class MpFileExplorer(Pyboard):
         """
 
         self.reset = reset
+        self._os_lib = os_lib
 
         try:
             Pyboard.__init__(self, self.__con_from_str(constr))
@@ -172,6 +173,7 @@ class MpFileExplorer(Pyboard):
         self.enter_raw_repl()
         try:
             self.exec_("import sys, ubinascii, uos")
+            self._os_lib = 'uos'
             self.dir = posixpath.join("/", self.eval("uos.system('pwd')").decode('utf8'))
         except Exception as e:
             logging.warning(e)
@@ -183,6 +185,18 @@ class MpFileExplorer(Pyboard):
 
         self.__set_sysname()
 
+    def __list_dir(self, path_):
+        res = None
+        try:
+            if self._os_lib == 'os':
+                res = self.eval("os.listdir('%s')" % path_)
+            elif self._os_lib == 'uos':
+                res = self.eval(f"[i[0] for i in uos.ilistdir('{path_}')]")
+        except Exception as e:
+            logging.error(e)
+        finally:
+            return res
+
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def ls(self, add_files=True, add_dirs=True, add_details=False):
 
@@ -190,19 +204,21 @@ class MpFileExplorer(Pyboard):
 
         try:
 
-            res = self.eval("os.listdir('%s')" % self.dir)
+            res = self.__list_dir(self.dir)
             tmp = ast.literal_eval(res.decode('utf-8'))
-
+            if not add_details:
+                return tmp
             if add_dirs:
                 for f in tmp:
                     try:
 
                         # if it is a dir, it could be listed with "os.listdir"
-                        self.eval("os.listdir('%s/%s')" % (self.dir.rstrip('/'), f))
-                        if add_details:
+                        ret_inner_tmp = self.__list_dir(os.path.join(self.dir, f))
+                        ret_inner = ast.literal_eval(ret_inner_tmp.decode('utf-8'))
+                        if len(ret_inner) > 0:
                             files.append((f, 'D'))
                         else:
-                            files.append(f)
+                            files.append((f, 'N'))
 
                     except PyboardError as e:
 
@@ -223,7 +239,8 @@ class MpFileExplorer(Pyboard):
                     try:
 
                         # if it is a file, "os.listdir" must fail
-                        self.eval("os.listdir('%s/%s')" % (self.dir.rstrip('/'), f))
+                        if self._os_lib == 'os':
+                            self.eval("os.listdir('%s/%s')" % (self.dir.rstrip('/'), f))
 
                     except PyboardError as e:
 
