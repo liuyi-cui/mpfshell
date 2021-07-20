@@ -24,10 +24,9 @@
 
 import time
 import logging
-import sys
 
 from serial import Serial
-from mp.conbase import ConBase, ConError
+from conbase import ConBase, ConError
 
 
 class ConSerial(ConBase):
@@ -66,6 +65,7 @@ class ConSerial(ConBase):
         return self.serial.close()
 
     def read(self, size):
+        logging.debug(f"serial read size: {size}")
         data = self.serial.read(size)
         logging.debug("serial read < %s" % str(data))
         return data
@@ -79,4 +79,3 @@ class ConSerial(ConBase):
 
     def survives_soft_reset(self):
         return False
-

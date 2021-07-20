@@ -28,7 +28,7 @@ import time
 import telnetlib
 
 from collections import deque
-from mp.conbase import ConBase, ConError
+from conbase import ConBase, ConError
 
 
 class ConTelnet(ConBase):

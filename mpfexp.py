@@ -34,13 +34,13 @@ import subprocess
 import ast
 import sys
 
-from mp.pyboard import Pyboard
-from mp.pyboard import PyboardError
-from mp.conserial import ConSerial
-from mp.contelnet import ConTelnet
-from mp.conwebsock import ConWebsock
-from mp.conbase import ConError
-from mp.retry import retry
+from pyboard import Pyboard
+from pyboard import PyboardError
+from conserial import ConSerial
+from contelnet import ConTelnet
+from conwebsock import ConWebsock
+from conbase import ConError
+from retry import retry
 
 
 def _was_file_not_existing(exception):
@@ -170,12 +170,16 @@ class MpFileExplorer(Pyboard):
     def setup(self):
 
         self.enter_raw_repl()
-        self.exec_("import os, sys, ubinascii")
-
-        # New version mounts files on /flash so lets set dir based on where we are in
-        # filesystem.
-        # Using the "path.join" to make sure we get "/" if "os.getcwd" returns "".
-        self.dir = posixpath.join("/", self.eval("os.getcwd()").decode('utf8'))
+        try:
+            self.exec_("import sys, ubinascii, uos")
+            self.dir = posixpath.join("/", self.eval("uos.system('pwd')").decode('utf8'))
+        except Exception as e:
+            logging.warning(e)
+            self.exec_("import os, sys, ubinascii")
+            # New version mounts files on /flash so lets set dir based on where we are in
+            # filesystem.
+            # Using the "path.join" to make sure we get "/" if "os.getcwd" returns "".
+            self.dir = posixpath.join("/", self.eval("os.getcwd()").decode('utf8'))
 
         self.__set_sysname()
 

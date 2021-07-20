@@ -34,13 +34,13 @@ import logging
 import platform
 import time
 
-from mp import version
-from mp.mpfexp import MpFileExplorer
-from mp.mpfexp import MpFileExplorerCaching
-from mp.mpfexp import RemoteIOError
-from mp.pyboard import PyboardError
-from mp.conbase import ConError
-from mp.tokenizer import Tokenizer
+import version
+from mpfexp import MpFileExplorer
+from mpfexp import MpFileExplorerCaching
+from mpfexp import RemoteIOError
+from pyboard import PyboardError
+from conbase import ConError
+from tokenizer import Tokenizer
 
 
 class MpFileShell(cmd.Cmd):
@@ -72,6 +72,7 @@ class MpFileShell(cmd.Cmd):
             plist = self.all_serial()
             if len(plist) <= 0:
                 print("serial not found!")
+                logging.error("serial not found")
             else:
                 for serial in plist:
                     print("serial name :", serial[1], " : ", serial[0].split('/')[-1])
@@ -748,7 +749,7 @@ class MpFileShell(cmd.Cmd):
 
             if self.repl is None:
 
-                from mp.term import Term
+                from term import Term
                 self.repl = Term(self.fe.con)
 
                 if platform.system() == "Windows":
@@ -840,7 +841,7 @@ def main():
     if args.logfile is not None:
         logging.basicConfig(format=format, filename=args.logfile, level=args.loglevel)
     else:
-        logging.basicConfig(format=format, level=logging.CRITICAL)
+        logging.basicConfig(filename="log/mpfshell.log", format=format, level=logging.DEBUG)
 
     logging.info('Micropython File Shell v%s started' % version.FULL)
     logging.info('Running on Python %d.%d using PySerial %s' \

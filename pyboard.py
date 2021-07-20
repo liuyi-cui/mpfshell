@@ -6,7 +6,7 @@ Pyboard REPL interface
 
 import sys
 import time
-import serial
+import logging
 
 try:
     stdout = sys.stdout.buffer
@@ -57,7 +57,8 @@ class Pyboard:
                 timeout_count += 1
                 if timeout is not None and timeout_count >= 100 * timeout:
                     break
-                time.sleep(0.01) 
+                time.sleep(0.01)
+        logging.info(f"read until {ending} data: {data}")
         return data
 
     def enter_raw_repl(self):

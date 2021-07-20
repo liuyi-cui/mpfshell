@@ -29,7 +29,7 @@ import time
 import logging
 
 from collections import deque
-from mp.conbase import ConBase, ConError
+from conbase import ConBase, ConError
 
 
 class ConWebsock(ConBase, threading.Thread):
