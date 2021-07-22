@@ -197,8 +197,10 @@ class MpFileExplorer(Pyboard):
                 res = self.eval(f"[i[0] for i in uos.ilistdir('{path_}')]")
         except Exception as e:
             logging.error(e)
-            raise e
+            res = e
         finally:
+            if isinstance(res, Exception):
+                raise res
             return res
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
@@ -218,11 +220,14 @@ class MpFileExplorer(Pyboard):
 
                         # if it is a dir, it could be listed with "os.listdir"
                         ret_inner_tmp = self.__list_dir(os.path.join(f))
-                        ret_inner = ast.literal_eval(ret_inner_tmp.decode('utf-8'))
-                        if len(ret_inner) > 0:
-                            files.append((f, 'D'))
-                        else:
+                        if ret_inner_tmp is None:
                             files.append((f, 'F'))
+                        else:
+                            ret_inner = ast.literal_eval(ret_inner_tmp.decode('utf-8'))
+                            if len(ret_inner) > 0:
+                                files.append((f, 'D'))
+                            else:
+                                files.append((f, 'F'))
 
                     except PyboardError as e:
 
