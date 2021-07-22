@@ -723,7 +723,7 @@ class MpFileShell(cmd.Cmd):
 
             try:
                 self.fe.exec_raw_no_follow(args + "\n")
-                ret = self.fe.follow(None, data_consumer)
+                ret = self.fe.follow(1, data_consumer)
 
                 if len(ret[-1]):
                     self.__error(str(ret[-1].decode('utf-8')))
@@ -733,7 +733,7 @@ class MpFileShell(cmd.Cmd):
             except PyboardError as e:
                 self.__error(str(e))
             except Exception as e:
-                print(e)
+                logging.error(e)
 
     def do_r(self, args):
         self.do_repl(args)

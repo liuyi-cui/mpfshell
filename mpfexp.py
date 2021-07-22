@@ -170,13 +170,16 @@ class MpFileExplorer(Pyboard):
 
     def setup(self):
 
-        self.enter_raw_repl()
-        try:
-            self.exec_("import sys, ubinascii, uos")
+        board_model = self.get_board_info()
+        self.exit_raw_repl()
+        if board_model == 'stm32l475':
             self._os_lib = 'uos'
+
+        self.enter_raw_repl()
+        if self._os_lib == 'uos':
+            self.exec_("import sys, ubinascii, uos")
             self.dir = posixpath.join("/", self.eval("uos.system('pwd')").decode('utf8'))
-        except Exception as e:
-            logging.warning(e)
+        else:
             self.exec_("import os, sys, ubinascii")
             # New version mounts files on /flash so lets set dir based on where we are in
             # filesystem.
@@ -194,6 +197,7 @@ class MpFileExplorer(Pyboard):
                 res = self.eval(f"[i[0] for i in uos.ilistdir('{path_}')]")
         except Exception as e:
             logging.error(e)
+            raise e
         finally:
             return res
 
@@ -213,12 +217,12 @@ class MpFileExplorer(Pyboard):
                     try:
 
                         # if it is a dir, it could be listed with "os.listdir"
-                        ret_inner_tmp = self.__list_dir(os.path.join(self.dir, f))
+                        ret_inner_tmp = self.__list_dir(os.path.join(f))
                         ret_inner = ast.literal_eval(ret_inner_tmp.decode('utf-8'))
                         if len(ret_inner) > 0:
                             files.append((f, 'D'))
                         else:
-                            files.append((f, 'N'))
+                            files.append((f, 'F'))
 
                     except PyboardError as e:
 
@@ -262,6 +266,14 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def rm(self, target):
+
+        if self._os_lib == 'uos':
+            try:
+                self.eval(f"uos.remove('{self._fqn(target)}')")
+            except PyboardError as e:
+                raise e
+            finally:
+                return
 
         try:
             # 1st try to delete it as a file
@@ -346,9 +358,9 @@ class MpFileExplorer(Pyboard):
             raise RemoteIOError("Error in regular expression: %s" % e)
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def get(self, src, dst=None):
+    def get(self, src, dst=None, varify=True):
 
-        if src not in self.ls():
+        if varify and src not in self.ls():
             raise RemoteIOError("No such file or directory: '%s'" % self._fqn(src))
 
         if dst is None:
@@ -366,6 +378,7 @@ class MpFileExplorer(Pyboard):
                 "    break\r\n"
                 "  sys.stdout.write(c)\r\n" % self.BIN_CHUNK_SIZE
             )
+            self.exec_("f.close()")
 
         except PyboardError as e:
             if _was_file_not_existing(e):
@@ -388,7 +401,7 @@ class MpFileExplorer(Pyboard):
                     if verbose:
                         print(" * get %s" % f)
 
-                    self.get(f, dst=posixpath.join(dst_dir, f))
+                    self.get(f, dst=posixpath.join(dst_dir, f), varify=False)
 
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
@@ -467,8 +480,7 @@ class MpFileExplorer(Pyboard):
 
         # see if the new dir exists
         try:
-
-            self.eval("os.listdir('%s')" % tmp_dir)
+            self.__list_dir(tmp_dir)
             self.dir = tmp_dir
 
         except PyboardError as e:
@@ -485,7 +497,10 @@ class MpFileExplorer(Pyboard):
 
         try:
 
-            self.eval("os.mkdir('%s')" % self._fqn(target))
+            if self._os_lib == 'uos':
+                self.eval("uos.mkdir('%s')" % self._fqn(target))
+            else:
+                self.eval("os.mkdir('%s')" % self._fqn(target))
 
         except PyboardError as e:
             if _was_file_not_existing(e):

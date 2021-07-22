@@ -5,6 +5,7 @@ Pyboard REPL interface
 """
 
 import sys
+import re
 import time
 import logging
 
@@ -60,6 +61,32 @@ class Pyboard:
                 time.sleep(0.01)
         logging.info(f"read until {ending} data: {data}")
         return data
+
+    def get_board_info(self):
+        board_model_pattern = r'MicroPython board with (\w+)'
+        board_model = None
+        for i in range(8):
+            time.sleep(0.1)
+            self.con.write(b'\x03\x03\x03\x03')
+            time.sleep(0.1)
+            self.con.write(b'\x02\x02\x02\x02')
+            time.sleep(0.1)
+
+            data = self.read_until(1, b'>>>', timeout=5, max_recv=8000)
+            if not data.endswith(b'>>>'):
+                # print(data)
+                print('Could not enter raw repl, Press Reset key after 10 seconds.')
+            else:
+                break
+
+        # flush input (without relying on serial.flushInput())
+        n = self.con.inWaiting()
+        data = self.con.read(n)
+        if data:
+            ret = re.search(board_model_pattern, data.decode('utf-8'))
+            if ret:
+                board_model = ret.group(1)
+        return board_model
 
     def enter_raw_repl(self):
         # self.con.write(b'\x6D\x70\x79')
