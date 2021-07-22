@@ -195,13 +195,10 @@ class MpFileExplorer(Pyboard):
                 res = self.eval("os.listdir('%s')" % path_)
             elif self._os_lib == 'uos':
                 res = self.eval(f"[i[0] for i in uos.ilistdir('{path_}')]")
-        except Exception as e:
-            logging.error(e)
-            res = e
-        finally:
-            if isinstance(res, Exception):
-                raise res
             return res
+        except PyboardError as e:
+            logging.error(e)
+            raise e
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def ls(self, add_files=True, add_dirs=True, add_details=False):
@@ -211,6 +208,8 @@ class MpFileExplorer(Pyboard):
         try:
 
             res = self.__list_dir(self.dir)
+            if res is None:
+                return files
             tmp = ast.literal_eval(res.decode('utf-8'))
             if not add_details:
                 return tmp
