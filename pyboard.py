@@ -62,6 +62,44 @@ class Pyboard:
         logging.info(f"read until {ending} data: {data}")
         return data
 
+    def _exit_mpy(self):
+        """
+        exit mpy model and enter shell model
+        """
+        self.con.write(b'\x04')
+        time.sleep(0.5)
+
+    def _enter_mpy(self):
+        """
+        exit shell model and enter mpy model
+        """
+        self.con.write(b'mpy')
+        self.con.write(b'\r\x03\r\n')
+        self.con.write(b'\r\x02\r\n')
+
+    def exec_command_in_shell(self, command: str):
+        """
+        execute command in shell model
+        Args:
+            command:
+
+        Returns:
+
+        """
+        self._exit_mpy()
+        self.con.write(command.encode('utf-8'))
+        self.con.write(b'\r\n')
+        time.sleep(0.5)
+        data = b''
+        num = 0
+        while num < self.con.inWaiting():
+            to_read = self.con.inWaiting()
+            data += self.con.read(to_read)
+            num += to_read
+        self._enter_mpy()
+        return data
+
+
     def get_board_info(self):
         board_model_pattern = r'MicroPython board with (\w+)'
         board_model = None

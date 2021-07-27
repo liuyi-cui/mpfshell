@@ -32,6 +32,7 @@ import sys
 import serial
 import logging
 import platform
+import re
 import time
 
 import version
@@ -657,25 +658,22 @@ class MpFileShell(cmd.Cmd):
         """execfile(ef) <REMOTE FILE>
         Execute a Python filename on remote.
         """
-        if self.__is_open():
-            try:
-                self.do_exec("f=open('%s')\nexec(f.read())\nf.close()" % args)
-                # ret = self.fe.follow(2)
-                # if len(ret[-1]):
-                #     self.__error(str(ret[-1].decode('utf-8')))
-            except KeyboardInterrupt as e:
-                self.fe.keyboard_interrupt()
-                print(e)
-            except PyboardError as e:
-                print(e)
-            except Exception as e:
-                print(e)
-            finally:
-                if (self.open_args.startswith("ser:")):
-                    self.__reconnect()
-                if (self.__is_open()):
-                    # self.fe.enter_raw_repl()
-                    print("skip repl check")
+        if not args:
+            self.__error("Missing arguments: <REMOTE .PY FILE>")
+        if not args.endswith('.py'):
+            self.__error("Remote file must be a python executable file")
+        command = f'mpy {args}'
+        try:
+            command_data = self.fe.exec_command_in_shell(command)
+            command_data = command_data.decode('utf-8')
+            data = ''.join(re.split('sh[\s/>]+', command_data)[1:])
+            data.strip()
+            print(data)
+            logging.info(f'{command_data} result: {data}')
+        except Exception as e:
+            logging.error(e)
+            print(e)
+        self.__reconnect()
 
     def do_lef(self, args):
         self.do_lexecfile(args)

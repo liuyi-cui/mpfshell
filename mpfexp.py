@@ -64,7 +64,7 @@ class RemoteIOError(IOError):
 
 class MpFileExplorer(Pyboard):
 
-    BIN_CHUNK_SIZE = 64 * 100
+    BIN_CHUNK_SIZE = 16 * 100
     MAX_TRIES = 3
 
     def __init__(self, constr, reset=False, os_lib='os'):
@@ -172,7 +172,7 @@ class MpFileExplorer(Pyboard):
 
         board_model = self.get_board_info()
         self.exit_raw_repl()
-        if board_model == 'stm32l475':
+        if board_model == 'stm32l401':
             self._os_lib = 'uos'
 
         self.enter_raw_repl()
