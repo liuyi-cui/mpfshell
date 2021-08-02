@@ -29,6 +29,7 @@ class PyboardError(BaseException):
 class Pyboard:
 
     def __init__(self, conbase):
+        logging.info('Init Pyboard')
 
         self.con = conbase
 
@@ -59,7 +60,7 @@ class Pyboard:
                 if timeout is not None and timeout_count >= 100 * timeout:
                     break
                 time.sleep(0.01)
-        logging.info(f"read until {ending} data: {data}")
+        logging.debug(f"read until {ending} data: {data}")
         return data
 
     def _exit_mpy(self):
@@ -98,7 +99,6 @@ class Pyboard:
             num += to_read
         self._enter_mpy()
         return data
-
 
     def get_board_info(self):
         board_model_pattern = r'MicroPython board with (\w+)'
@@ -219,15 +219,11 @@ class Pyboard:
         return ret
 
     def exec_(self, command):
+        logging.info(f'execute command {command}')
         ret, ret_err = self.exec_raw(command)
         if ret_err:
             raise PyboardError('exception', ret, ret_err)
         return ret
-
-    def execfile(self, filename):
-        with open(filename, 'rb') as f:
-            pyfile = f.read()
-        return self.exec_(pyfile)
 
     def get_time(self):
         t = str(self.eval('pyb.RTC().datetime()').encode("utf-8"))[1:-1].split(', ')

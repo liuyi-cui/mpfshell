@@ -41,6 +41,7 @@ from contelnet import ConTelnet
 from conwebsock import ConWebsock
 from conbase import ConError
 from retry import retry
+from utility.file_util import MD5Varifier
 
 
 def _was_file_not_existing(exception):
@@ -78,7 +79,9 @@ class MpFileExplorer(Pyboard):
         :param constr:      Connection string as defined above.
         """
 
+        logging.info('Init MpFileExplorer')
         self.reset = reset
+        self.md5_varifier = MD5Varifier()
         self._os_lib = os_lib
 
         try:
@@ -89,6 +92,7 @@ class MpFileExplorer(Pyboard):
         self.dir = None
         self.sysname = None
         self.setup()
+        self._init_md5_varify()
 
     def __del__(self):
 
@@ -103,6 +107,7 @@ class MpFileExplorer(Pyboard):
             pass
 
     def __con_from_str(self, constr):
+        logging.info(f'Build serial connection from {constr}')
 
         con = None
 
@@ -156,24 +161,30 @@ class MpFileExplorer(Pyboard):
 
     def __set_sysname(self):
         self.sysname = sys.platform
+        logging.info(f'Set sysname is {self.sysname}')
         # self.sysname = self.eval("os.uname()[0]").decode('utf-8')
 
     def close(self):
+        logging.info('Close the connection')
 
         Pyboard.close(self)
         self.dir = None
 
     def teardown(self):
+        logging.info('Teardown')
 
         self.exit_raw_repl()
         self.sysname = None
 
     def setup(self):
+        logging.info('Set up')
 
         board_model = self.get_board_info()
+        logging.info(f'Get board model is {board_model}')
         self.exit_raw_repl()
         if board_model == 'stm32l401':
             self._os_lib = 'uos'
+            logging.info('Set os lib is uos on board')
 
         self.enter_raw_repl()
         if self._os_lib == 'uos':
@@ -185,10 +196,18 @@ class MpFileExplorer(Pyboard):
             # filesystem.
             # Using the "path.join" to make sure we get "/" if "os.getcwd" returns "".
             self.dir = posixpath.join("/", self.eval("os.getcwd()").decode('utf8'))
+        logging.info(f'Set work dir is {self.dir}')
 
         self.__set_sysname()
 
+    def _init_md5_varify(self):
+        logging.info('Init md5 varify cache')
+        remote_sign = self.md5_varifier.cache_file
+        cache_data = self._do_read_remote(remote_sign)  # 读取出来的data
+        self.md5_varifier.init_cache(cache_data)
+
     def __list_dir(self, path_):
+        logging.info(f'get listdir of {path_}')
         res = None
         try:
             if self._os_lib == 'os':
@@ -202,6 +221,7 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def ls(self, add_files=True, add_dirs=True, add_details=False):
+        logging.info(f'ls {self.dir}')
 
         files = []
 
@@ -211,7 +231,7 @@ class MpFileExplorer(Pyboard):
             if res is None:
                 return files
             tmp = ast.literal_eval(res.decode('utf-8'))
-            if not add_details:
+            if not add_details and add_dirs:
                 return tmp
             if add_dirs:
                 for f in tmp:
@@ -270,6 +290,7 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def rm(self, target):
+        logging.info(f'rm {target}')
 
         if self._os_lib == 'uos':
             try:
@@ -299,6 +320,7 @@ class MpFileExplorer(Pyboard):
                     raise e
 
     def mrm(self, pat, verbose=False):
+        logging.info(f'mrm {pat}')
 
         files = self.ls(add_dirs=False)
         find = re.compile(pat)
@@ -310,16 +332,18 @@ class MpFileExplorer(Pyboard):
 
                 self.rm(f)
 
-    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def put(self, src, dst=None):
+    def _do_write_remote(self, dst: str, data: bytes) -> None:
+        """
+        write operation on remote file
+        Args:
+            dst: remote file path
+            data: fp.read()
 
-        f = open(src, "rb")
-        data = f.read()
-        f.close()
+        Returns:
+            None
 
-        if dst is None:
-            dst = src
-
+        """
+        logging.info(f"write data to {dst}")
         try:
 
             self.exec_("f = open('%s', 'wb')" % self._fqn(dst))
@@ -344,7 +368,24 @@ class MpFileExplorer(Pyboard):
             else:
                 raise e
 
+    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
+    def put(self, src, dst=None):
+        logging.info(f'put {src} to remote')
+
+        cache_value = self.md5_varifier.varify_sign(src, dst)
+        if cache_value:
+            self._do_write_remote(self.md5_varifier.cache_file, cache_value)
+            f = open(src, "rb")
+            data = f.read()
+            f.close()
+
+            if dst is None:
+                dst = src
+
+            self._do_write_remote(dst, data)
+
     def mput(self, src_dir, pat, verbose=False):
+        logging.info(f'mput {src_dir} {pat}')
 
         try:
 
@@ -361,20 +402,22 @@ class MpFileExplorer(Pyboard):
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
 
-    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def get(self, src, dst=None, varify=True):
+    def _do_read_remote(self, dst: str) -> bytes:
+        """
+        read operation on remote file
+        Args:
+            dst: remote file path
 
-        if varify and src not in self.ls():
-            raise RemoteIOError("No such file or directory: '%s'" % self._fqn(src))
+        Returns:
+            bytes
 
-        if dst is None:
-            dst = src
-
-        f = open(dst, "wb")
-
+        """
+        logging.info(f'read remote file {dst}')
         try:
 
-            self.exec_("f = open('%s', 'rb')" % self._fqn(src))
+            self.exec_("f = open('%s', 'a')" % self._fqn(dst))
+            self.exec_("f.close()")
+            self.exec_("f = open('%s', 'rb')" % self._fqn(dst))
             ret = self.exec_(
                 "while True:\r\n"
                 "  c = ubinascii.hexlify(f.read(%s))\r\n"
@@ -386,14 +429,27 @@ class MpFileExplorer(Pyboard):
 
         except PyboardError as e:
             if _was_file_not_existing(e):
-                raise RemoteIOError("Failed to read file: %s" % src)
+                raise RemoteIOError("Failed to read file: %s" % dst)
             else:
                 raise e
+        return ret
 
-        f.write(binascii.unhexlify(ret))
-        f.close()
+    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
+    def get(self, src, dst=None, varify=True):
+        logging.info(f'get remote file {src} to local {dst}')
+
+        if varify and src not in self.ls():
+            raise RemoteIOError("No such file or directory: '%s'" % self._fqn(src))
+
+        if dst is None:
+            dst = src
+
+        ret = self._do_read_remote(src)
+        with open(dst, 'wb') as fp:
+           fp.write(binascii.unhexlify(ret))
 
     def mget(self, dst_dir, pat, verbose=False):
+        logging.info(f'mget {dst_dir} {pat}')
 
         try:
 
@@ -446,34 +502,8 @@ class MpFileExplorer(Pyboard):
             return fs
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def puts(self, dst, lines):
-
-        try:
-
-            data = lines.encode("utf-8")
-
-            self.exec_("f = open('%s', 'wb')" % self._fqn(dst))
-            
-            while True:
-                c = binascii.hexlify(data[:self.BIN_CHUNK_SIZE])
-                if not len(c):
-                    break
-
-                self.exec_("f.write(ubinascii.unhexlify('%s'))" % c.decode('utf-8'))
-                data = data[self.BIN_CHUNK_SIZE:]
-
-            self.exec_("f.close()")
-
-        except PyboardError as e:
-            if _was_file_not_existing(e):
-                raise RemoteIOError("Failed to create file: %s" % dst)
-            elif "EACCES" in str(e):
-                raise RemoteIOError("Existing directory: %s" % dst)
-            else:
-                raise e
-
-    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def cd(self, target):
+        logging.info(f'cd {target}')
 
         if target.startswith("/"):
             tmp_dir = target
@@ -494,10 +524,12 @@ class MpFileExplorer(Pyboard):
                 raise e
 
     def pwd(self):
+        logging.info(f'pwd is {self.dir}')
         return self.dir
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def md(self, target):
+        logging.info(f'mkdir {target}')
 
         try:
 
@@ -515,6 +547,7 @@ class MpFileExplorer(Pyboard):
                 raise e
 
     def mpy_cross(self, src, dst=None):
+        logging.info('do mpy cross')
 
         if dst is None:
             return_code = subprocess.call("mpy-cross %s" % (src), shell=True)
@@ -539,11 +572,7 @@ class MpFileExplorerCaching(MpFileExplorer):
 
     def __cache_hit(self, path):
 
-        if path in self.cache:
-            logging.debug("cache hit for '%s': %s" % (path, self.cache[path]))
-            return self.cache[path]
-
-        return None
+        return self.cache.get(path)
 
     def ls(self, add_files=True, add_dirs=True, add_details=False):
 
@@ -584,20 +613,6 @@ class MpFileExplorerCaching(MpFileExplorer):
 
         if dst is None:
             dst = src
-
-        path = posixpath.split(self._fqn(dst))
-        newitm = path[-1]
-        parent = path[:-1][0]
-
-        hit = self.__cache_hit(parent)
-
-        if hit is not None:
-            if not (dst, 'F') in hit:
-                self.__cache(parent, hit + [(newitm, 'F')])
-
-    def puts(self, dst, lines):
-
-        MpFileExplorer.puts(self, dst, lines)
 
         path = posixpath.split(self._fqn(dst))
         newitm = path[-1]
