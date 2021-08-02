@@ -33,6 +33,7 @@ import logging
 import subprocess
 import ast
 import sys
+from pathlib import Path
 
 from pyboard import Pyboard
 from pyboard import PyboardError
@@ -370,7 +371,7 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def put(self, src, dst=None):
-        logging.info(f'put {src} to remote')
+        logging.info(f'put {src} to remote {dst}')
 
         cache_value = self.md5_varifier.varify_sign(src, dst)
         if cache_value:
@@ -609,6 +610,20 @@ class MpFileExplorerCaching(MpFileExplorer):
 
     def put(self, src, dst=None):
 
+        tmp_dirs = Path(src).parts  # 仅使用与windows环境
+        if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
+            dirs = tmp_dirs[1:]
+            dir_index = 0
+            ori_dir = ''
+            while dir_index < len(dirs) - 1:
+                cur_dir = str(Path(ori_dir, dirs[dir_index]))
+                try:
+                    self.md(cur_dir)
+                except Exception as e:
+                    pass
+                dir_index += 1
+                ori_dir = cur_dir
+            dst = str(Path(cur_dir, dirs[-1]))
         MpFileExplorer.put(self, src, dst)
 
         if dst is None:
