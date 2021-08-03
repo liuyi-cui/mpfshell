@@ -298,6 +298,9 @@ class MpFileExplorer(Pyboard):
                 self.eval(f"uos.remove('{self._fqn(target)}')")
             except PyboardError as e:
                 raise e
+            else:
+                sign_value = self.md5_varifier.rm_sign(self._fqn(target))
+                self._do_write_remote(self.md5_varifier.cache_file, sign_value)
             finally:
                 return
 
@@ -319,6 +322,9 @@ class MpFileExplorer(Pyboard):
                     raise RemoteIOError("Directory not empty: %s" % target)
                 else:
                     raise e
+        finally:
+            sign_value = self.md5_varifier.rm_sign(self._fqn(target))
+            self._do_write_remote(self.md5_varifier.cache_file, sign_value)
 
     def mrm(self, pat, verbose=False):
         logging.info(f'mrm {pat}')
