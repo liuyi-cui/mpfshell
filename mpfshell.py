@@ -115,7 +115,8 @@ class MpFileShell(cmd.Cmd):
                 self.fe = MpFileExplorerCaching(port, self.reset)
             else:
                 self.fe = MpFileExplorer(port, self.reset)
-            print("Connected to %s" % self.fe.sysname)
+            if not reconnect:
+                print("Connected to %s" % self.fe.sysname)
             self.__set_prompt_path()
         except PyboardError as e:
             logging.error(e)
@@ -131,12 +132,12 @@ class MpFileShell(cmd.Cmd):
 
         if reconnect and self.__is_open() == False:
             time.sleep(3)
-            self.__connect(None)
+            self.__connect(None, reconnect=reconnect)
 
     def __reconnect(self):
         import time
         for a in range(3):
-            self.__connect(None)
+            self.__connect(None, reconnect=True)
             if self.__is_open():
                 break
             print('try reconnect... ')
