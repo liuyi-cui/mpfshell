@@ -397,14 +397,19 @@ class MpFileExplorer(Pyboard):
         try:
 
             find = re.compile(pat)
-            files = os.listdir(src_dir)
+            files = Path(src_dir).rglob('*')
 
             for f in files:
-                if posixpath.isfile(f) and find.match(f):
-                    if verbose:
-                        print(" * put %s" % f)
+                if find.match(str(f)):
+                    if f.is_file():
+                        if verbose:
+                            print(" * put %s" % str(f))
 
-                    self.put(posixpath.join(src_dir, f), f)
+                        self.put(str(f))
+                    elif f.is_dir():
+                        if verbose:
+                            print(f" * put {str(f)}")
+                        self.__mkdir_remote(str(f))
 
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
@@ -440,6 +445,29 @@ class MpFileExplorer(Pyboard):
             else:
                 raise e
         return ret
+
+    def __mkdir_remote(self, local_dir):
+        tmp_dirs = Path(local_dir).parts  # 仅使用与windows环境
+        logging.info(f"local_dir: {local_dir}")
+        logging.info(f"tmp_dirs: {tmp_dirs}")
+        if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
+            cur_dir = os.getcwd()
+            logging.info(f"cur_dir: {cur_dir}")
+            local_dir = local_dir[len(cur_dir)+1:]
+            dirs = Path(local_dir).parts
+            logging.info(f"dirs: {dirs}")
+            dir_index = 0
+            ori_dir = ''
+            while dir_index < len(dirs):
+                cur_dir = str(Path(ori_dir, dirs[dir_index]))
+                try:
+                    self.md(cur_dir)
+                except Exception as e:
+                    pass
+                dir_index += 1
+                ori_dir = cur_dir
+        else:
+            self.md(local_dir)
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def get(self, src, dst=None, varify=True):
@@ -617,8 +645,14 @@ class MpFileExplorerCaching(MpFileExplorer):
     def put(self, src, dst=None):
 
         tmp_dirs = Path(src).parts  # 仅使用与windows环境
+        logging.info(f"src: {src}")
+        logging.info(f"tmp_dirs: {tmp_dirs}")
         if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
-            dirs = tmp_dirs[1:]
+            cur_dir = os.getcwd()
+            logging.info(f"cur_dir: {cur_dir}")
+            src = src[len(cur_dir)+1:]
+            dirs = Path(src).parts
+            logging.info(f"dirs: {dirs}")
             dir_index = 0
             ori_dir = ''
             while dir_index < len(dirs) - 1:
@@ -629,7 +663,10 @@ class MpFileExplorerCaching(MpFileExplorer):
                     pass
                 dir_index += 1
                 ori_dir = cur_dir
-            dst = str(Path(cur_dir, dirs[-1]))
+            if src.startswith(os.getcwd()):
+                dst = str(Path(cur_dir[len(os.getcwd()):], dirs[-1]))
+            else:
+                dst = src
         MpFileExplorer.put(self, src, dst)
 
         if dst is None:

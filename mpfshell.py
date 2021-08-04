@@ -260,6 +260,8 @@ class MpFileShell(cmd.Cmd):
 
     def __sort_files(self, file_):
         if isinstance(file_, tuple):
+            if file_[1].startswith(" "):
+                return float('inf')
             return file_[1]
         return file_
 
