@@ -369,9 +369,11 @@ class MpFileExplorer(Pyboard):
 
         except PyboardError as e:
             if _was_file_not_existing(e):
-                raise RemoteIOError("Failed to create file: %s" % dst)
+                logging.warning("Failed to create file: %s" % dst)
+                print("Failed to create file: %s" % dst)
             elif "EACCES" in str(e):
-                raise RemoteIOError("Existing directory: %s" % dst)
+                logging.warning("Existing directory: %s" % dst)
+                print("Existing directory: %s" % dst)
             else:
                 raise e
 
