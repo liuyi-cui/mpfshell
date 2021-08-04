@@ -322,7 +322,10 @@ class MpFileExplorer(Pyboard):
                     raise RemoteIOError("Directory not empty: %s" % target)
                 else:
                     raise e
-        finally:
+            else:
+                sign_value = self.md5_varifier.rm_sign(self._fqn(target))
+                self._do_write_remote(self.md5_varifier.cache_file, sign_value)
+        else:
             sign_value = self.md5_varifier.rm_sign(self._fqn(target))
             self._do_write_remote(self.md5_varifier.cache_file, sign_value)
 
@@ -339,7 +342,7 @@ class MpFileExplorer(Pyboard):
 
                 self.rm(f)
 
-    def _do_write_remote(self, dst: str, data: bytes) -> None:
+    def _do_write_remote(self, dst: str, data: bytes, verbose=False) -> None:
         """
         write operation on remote file
         Args:
@@ -364,7 +367,8 @@ class MpFileExplorer(Pyboard):
                 self.exec_("f.write(ubinascii.unhexlify('%s'))" % c.decode('utf-8'))
                 data = data[self.BIN_CHUNK_SIZE:]
 
-                print("\ttransfer %d of %d" % (file_size - len(data), file_size))
+                if verbose:
+                    print("\ttransfer %d of %d" % (file_size - len(data), file_size))
             self.exec_("f.close()")
 
         except PyboardError as e:
@@ -390,7 +394,7 @@ class MpFileExplorer(Pyboard):
             if dst is None:
                 dst = src
 
-            self._do_write_remote(dst, data)
+            self._do_write_remote(dst, data, verbose=True)
             self._do_write_remote(self.md5_varifier.cache_file, cache_value)
 
     def mput(self, src_dir, pat, verbose=False):
