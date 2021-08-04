@@ -452,6 +452,26 @@ class MpFileExplorer(Pyboard):
                 raise e
         return ret
 
+    @staticmethod
+    def __mkdir_local(remote_dir):
+        """
+        创建本地文件夹
+        Args:
+            remote_dir:
+
+        Returns:
+
+        """
+        def sort_path(file_path: Path):
+            return len(file_path.parts)
+
+        dirs = sorted(list(Path(remote_dir).parents), key=sort_path)
+        for dir_ in dirs:
+            if len(dir_.parts) > 0:
+                logging.info(f"mkdir {str(dir_)}")
+                dir_.mkdir(exist_ok=True)
+        Path(remote_dir).mkdir(exist_ok=True)
+
     def __mkdir_remote(self, local_dir):
         tmp_dirs = Path(local_dir).parts  # 仅使用与windows环境
         logging.info(f"local_dir: {local_dir}")
@@ -476,7 +496,18 @@ class MpFileExplorer(Pyboard):
             self.md(local_dir)
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def get(self, src, dst=None, varify=True):
+    def get(self, src: str, dst=None, varify=True):
+        """
+        read remote file and write in local file
+        Args:
+            src: remote file path
+            dst: local file path
+            varify: varify the remote file exists or not
+
+        Returns:
+            None
+
+        """
         logging.info(f'get remote file {src} to local {dst}')
 
         if varify and src not in self.ls():
@@ -485,9 +516,23 @@ class MpFileExplorer(Pyboard):
         if dst is None:
             dst = src
 
-        ret = self._do_read_remote(src)
-        with open(dst, 'wb') as fp:
-           fp.write(binascii.unhexlify(ret))
+        try:
+            ret = self._do_read_remote(src)
+        except Exception as e:
+            if str(e).startswith('Failed to read file'):  # src为文件夹路径
+                self.__mkdir_local(src)
+                tmp_files = self.__list_dir(src)
+                files = ast.literal_eval(tmp_files.decode('utf-8'))
+                logging.info(f"get listdir of {src} is {files}")
+                if files:
+                    for file in files:
+                        file_path = f"{src}/{file}"  # TODO 系统的路径拼接为\，因此手动拼接
+                        self.get(file_path, None, False)
+        else:
+            if not Path(dst).parent.exists():
+                self.__mkdir_local(str(Path(dst).parent))
+            with open(dst, 'wb') as fp:
+                fp.write(binascii.unhexlify(ret))
 
     def mget(self, dst_dir, pat, verbose=False):
         logging.info(f'mget {dst_dir} {pat}')
