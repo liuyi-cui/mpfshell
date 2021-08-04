@@ -383,7 +383,6 @@ class MpFileExplorer(Pyboard):
 
         cache_value = self.md5_varifier.varify_sign(src, dst)
         if cache_value:
-            self._do_write_remote(self.md5_varifier.cache_file, cache_value)
             f = open(src, "rb")
             data = f.read()
             f.close()
@@ -392,6 +391,7 @@ class MpFileExplorer(Pyboard):
                 dst = src
 
             self._do_write_remote(dst, data)
+            self._do_write_remote(self.md5_varifier.cache_file, cache_value)
 
     def mput(self, src_dir, pat, verbose=False):
         logging.info(f'mput {src_dir} {pat}')
