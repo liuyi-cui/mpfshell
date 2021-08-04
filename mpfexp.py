@@ -521,7 +521,7 @@ class MpFileExplorer(Pyboard):
         except Exception as e:
             if str(e).startswith('Failed to read file'):  # src为文件夹路径
                 self.__mkdir_local(src)
-                tmp_files = self.__list_dir(src)
+                tmp_files = self.__list_dir(self._fqn(src))
                 files = ast.literal_eval(tmp_files.decode('utf-8'))
                 logging.info(f"get listdir of {src} is {files}")
                 if files:
@@ -539,7 +539,7 @@ class MpFileExplorer(Pyboard):
 
         try:
 
-            files = self.ls(add_dirs=False)
+            files = self.ls()
             find = re.compile(pat)
 
             for f in files:
