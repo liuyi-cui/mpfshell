@@ -292,6 +292,7 @@ class MpFileExplorer(Pyboard):
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def rm(self, target):
         logging.info(f'rm {target}')
+        print(f" * rm {target}")
 
         if self._os_lib == 'uos':
             try:
@@ -322,14 +323,11 @@ class MpFileExplorer(Pyboard):
                     raise RemoteIOError("Directory not empty: %s" % target)
                 else:
                     raise e
-            else:
-                sign_value = self.md5_varifier.rm_sign(self._fqn(target))
-                self._do_write_remote(self.md5_varifier.cache_file, sign_value)
         else:
             sign_value = self.md5_varifier.rm_sign(self._fqn(target))
             self._do_write_remote(self.md5_varifier.cache_file, sign_value)
 
-    def mrm(self, pat, verbose=False):
+    def mrm(self, pat):
         logging.info(f'mrm {pat}')
 
         files = self.ls(add_dirs=False)
@@ -337,9 +335,6 @@ class MpFileExplorer(Pyboard):
 
         for f in files:
             if find.match(f):
-                if verbose:
-                    print(" * rm %s" % f)
-
                 self.rm(f)
 
     def _do_write_remote(self, dst: str, data: bytes, verbose=False) -> None:
@@ -403,7 +398,7 @@ class MpFileExplorer(Pyboard):
         try:
 
             find = re.compile(pat)
-            files = Path(src_dir).rglob('*')
+            files = Path(src_dir).glob('*')
 
             for f in files:
                 if find.match(str(f)):
@@ -688,8 +683,7 @@ class MpFileExplorerCaching(MpFileExplorer):
 
         files = MpFileExplorer.ls(self, add_files, add_dirs, add_details)
 
-        if add_files and add_dirs and add_details:
-            self.__cache(self.dir, files)
+        self.__cache(self.dir, files)
 
         return files
 
