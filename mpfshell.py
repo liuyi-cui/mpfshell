@@ -581,7 +581,7 @@ class MpFileShell(cmd.Cmd):
         elif self.__is_open():
 
             try:
-                self.fe.mrm(args, True)
+                self.fe.mrm(args)
             except IOError as e:
                 self.__error(str(e))
             except Exception as e:
