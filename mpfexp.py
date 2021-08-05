@@ -43,6 +43,7 @@ from conwebsock import ConWebsock
 from conbase import ConError
 from retry import retry
 from utility.file_util import MD5Varifier
+from utility.utils import repeat_inquiry
 
 
 def _was_file_not_existing(exception):
@@ -334,12 +335,13 @@ class MpFileExplorer(Pyboard):
     def mrm(self, pat):
         logging.info(f'mrm {pat}')
 
-        files = self.ls(add_dirs=False)
+        files = self.ls(add_dirs=False, add_details=True)
         find = re.compile(pat)
 
         for f in files:
-            if find.match(f):
-                self.rm(f)
+            file_name, file_type = f
+            if find.match(file_name):
+                self.rm(file_name)
 
     def _do_write_remote(self, dst: str, data: bytes, verbose=False) -> None:
         """
@@ -509,7 +511,7 @@ class MpFileExplorer(Pyboard):
         """
         logging.info(f'get remote file {src} to local {dst}')
 
-        if varify and src not in self.ls():
+        if varify and src not in self.ls(add_details=True):
             raise RemoteIOError("No such file or directory: '%s'" % self._fqn(src))
 
         if dst is None:
@@ -538,15 +540,16 @@ class MpFileExplorer(Pyboard):
 
         try:
 
-            files = self.ls()
+            files = self.ls(add_details=True)
             find = re.compile(pat)
 
             for f in files:
-                if find.match(f):
+                file_name, file_type = f
+                if find.match(file_name):
                     if verbose:
-                        print(" * get %s" % f)
+                        print(" * get %s" % file_name)
 
-                    self.get(f, dst=posixpath.join(dst_dir, f), varify=False)
+                    self.get(file_name, dst=posixpath.join(dst_dir, file_name), varify=False)
 
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
@@ -775,9 +778,16 @@ class MpFileExplorerCaching(MpFileExplorer):
         MpFileExplorer.rm(self, target)
         self.__update_cache(target, 'rm')
 
-    def rmrf(self, target):
+    def rmrf(self, target, confirm=True):
         """remove directories and their contents recursively"""
+        content = f'Warnning: \nYou are deleting {target} irreversibly, ' \
+                  'are you sure you want to do this'
+        if confirm:
+            if_do = repeat_inquiry(content)
+            if not if_do:
+                return
         files = self.ls(add_details=True)
+        print(f'rm {target}')
 
         for file_ in files:
             file_name, file_type = file_
@@ -787,19 +797,19 @@ class MpFileExplorerCaching(MpFileExplorer):
                     self.rm(file_name)
                 elif file_type == 'F':
                     self.rm(file_name)
-                # TODO 更新__cache
 
     def mrmrf(self, pat: str):
         logging.info(f'mrmrf {self.dir} {pat}')
 
         try:
 
-            files = self.ls()
+            files = self.ls(add_details=True)
             find = re.compile(pat)
 
             for f in files:
-                if find.match(f):
-                    self.rmrf(f)
+                file_name, file_type = f
+                if find.match(file_name):
+                    self.rmrf(file_name)
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
         except Exception as e:
