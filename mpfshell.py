@@ -820,6 +820,32 @@ class MpFileShell(cmd.Cmd):
         files = [o for o in os.listdir(".") if (os.path.isfile(os.path.join(".", o)) and o.endswith(".py"))]
         return [i for i in files if i.startswith(args[0])]
 
+    def do_rmrf(self, target):
+        if not len(target):
+            self.__error("Missing argument: <REMOTE DIR>")
+
+        elif self.__is_open():
+
+            try:
+                self.fe.rmrf(target)
+            except IOError as e:
+                self.__error(str(e))
+            except Exception as e:
+                print(e)
+
+    def do_mrmrf(self, args):
+        if not len(args):
+            self.__error("Missing argument: <SELECT REGEX>")
+
+        elif self.__is_open():
+
+            try:
+                self.fe.mrmrf(args)
+            except IOError as e:
+                self.__error(str(e))
+            except Exception as e:
+                print(e)
+
 
 def main():
     parser = argparse.ArgumentParser()

@@ -239,7 +239,7 @@ class MpFileExplorer(Pyboard):
                     try:
 
                         # if it is a dir, it could be listed with "os.listdir"
-                        ret_inner_tmp = self.__list_dir(os.path.join(f))
+                        ret_inner_tmp = self.__list_dir(f"{self.dir}/{f}")  # os/Path的拼接都不行
                         if ret_inner_tmp is None:
                             files.append((f, 'F'))
                         else:
@@ -267,7 +267,7 @@ class MpFileExplorer(Pyboard):
                 for f in tmp:
                     try:
 
-                        # if it is a file, "os.listdir" must fail
+                        # if it is a file, "os.listdir" must fail TODO 没有os又怎么办呢？
                         if self._os_lib == 'os':
                             self.eval("os.listdir('%s/%s')" % (self.dir.rstrip('/'), f))
 
@@ -291,8 +291,8 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def rm(self, target):
-        logging.info(f'rm {target}')
-        print(f" * rm {target}")
+        logging.info(f'rm {self._fqn(target)}')
+        print(f" * rm {self._fqn(target)}")
 
         if self._os_lib == 'uos':
             try:
@@ -302,6 +302,7 @@ class MpFileExplorer(Pyboard):
             else:
                 sign_value = self.md5_varifier.rm_sign(self._fqn(target))
                 self._do_write_remote(self.md5_varifier.cache_file, sign_value)
+                logging.info(f"rm {self._fqn(target)} success")
             finally:
                 return
 
@@ -323,7 +324,10 @@ class MpFileExplorer(Pyboard):
                     raise RemoteIOError("Directory not empty: %s" % target)
                 else:
                     raise e
+            else:
+                logging.info(f"rm {self._fqn(target)} success")
         else:
+            logging.info(f"rm {self._fqn(target)} success")
             sign_value = self.md5_varifier.rm_sign(self._fqn(target))
             self._do_write_remote(self.md5_varifier.cache_file, sign_value)
 
@@ -655,6 +659,48 @@ class MpFileExplorerCaching(MpFileExplorer):
 
         return self.cache.get(path)
 
+    def __update_cache(self, target: str, type: str, file_type='file'):
+        """
+        update __cache after option
+        Args:
+            target: dir/file
+            type: option type(rm/add)
+            file_type: file or dir
+
+        Returns:
+
+        """
+        path = posixpath.split(self._fqn(target))
+        opt_item = path[-1]
+        parent = path[:-1][0]
+
+        hit = self.__cache_hit(parent)
+        if hit is not None and type == 'add' and file_type == 'file':
+            if not (target, 'F') in hit:
+                self.__cache(parent, hit + [(opt_item, 'F')])
+        elif hit is not None and type == 'add' and file_type == 'dir':
+            if not (dir, 'D') in hit:
+                self.__cache(parent, hit + [(opt_item, 'D')])
+        elif hit is not None and type == 'rm':
+            files = []
+            for f in hit:
+                if f[0] != opt_item:
+                    files.append(f)
+            self.__cache(parent, files)
+
+    def __rm_dir_remote(self, file_name):
+        ori_dir = self.dir
+        self.cd(file_name)
+        child_files = self.ls(add_details=True)
+        for file_ in child_files:
+            file_name, file_type = file_
+            if file_type == 'D':
+                self.__rm_dir_remote(file_name)
+                self.rm(file_name)
+            elif file_type == 'F':
+                self.rm(file_name)
+        self.dir = ori_dir
+
     def ls(self, add_files=True, add_dirs=True, add_details=False):
 
         hit = self.__cache_hit(self.dir)
@@ -717,45 +763,45 @@ class MpFileExplorerCaching(MpFileExplorer):
         if dst is None:
             dst = src
 
-        path = posixpath.split(self._fqn(dst))
-        newitm = path[-1]
-        parent = path[:-1][0]
+        self.__update_cache(dst, 'add', 'file')
 
-        hit = self.__cache_hit(parent)
+    def md(self, dir_):
 
-        if hit is not None:
-            if not (dst, 'F') in hit:
-                self.__cache(parent, hit + [(newitm, 'F')])
-
-    def md(self, dir):
-
-        MpFileExplorer.md(self, dir)
-
-        path = posixpath.split(self._fqn(dir))
-        newitm = path[-1]
-        parent = path[:-1][0]
-
-        hit = self.__cache_hit(parent)
-
-        if hit is not None:
-            if not (dir, 'D') in hit:
-                self.__cache(parent, hit + [(newitm, 'D')])
+        MpFileExplorer.md(self, dir_)
+        self.__update_cache(dir_, 'add', 'dir')
 
     def rm(self, target):
 
         MpFileExplorer.rm(self, target)
+        self.__update_cache(target, 'rm')
 
-        path = posixpath.split(self._fqn(target))
-        rmitm = path[-1]
-        parent = path[:-1][0]
+    def rmrf(self, target):
+        """remove directories and their contents recursively"""
+        files = self.ls(add_details=True)
 
-        hit = self.__cache_hit(parent)
+        for file_ in files:
+            file_name, file_type = file_
+            if target == file_name:
+                if file_type == 'D':
+                    self.__rm_dir_remote(file_name)
+                    self.rm(file_name)
+                elif file_type == 'F':
+                    self.rm(file_name)
+                # TODO 更新__cache
 
-        if hit is not None:
-            files = []
+    def mrmrf(self, pat: str):
+        logging.info(f'mrmrf {self.dir} {pat}')
 
-            for f in hit:
-                if f[0] != rmitm:
-                    files.append(f)
+        try:
 
-            self.__cache(parent, files)
+            files = self.ls()
+            find = re.compile(pat)
+
+            for f in files:
+                if find.match(f):
+                    self.rmrf(f)
+        except sre_constants.error as e:
+            raise RemoteIOError("Error in regular expression: %s" % e)
+        except Exception as e:
+            logging.error(e)
+            raise e

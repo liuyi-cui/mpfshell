@@ -118,5 +118,6 @@ class MD5Varifier:
         if file_path_remote == self.cache_file[1:]:
             self._cache = {}
         else:
-            self._cache.pop(file_path_remote)
+            if file_path_remote in self._cache:
+                self._cache.pop(file_path_remote)
         return self._update_cache_file()
