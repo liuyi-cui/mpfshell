@@ -114,9 +114,7 @@ class MD5Varifier:
 
         """
         logging.info(f'remove sign of {file_path_remote}')
-        if file_path_remote.startswith('/'):
-            file_path_remote = file_path_remote[1:]
-        if file_path_remote == self.cache_file[1:]:
+        if file_path_remote == self.cache_file:
             self._cache = {}
         else:
             if file_path_remote in self._cache:
