@@ -354,7 +354,7 @@ class MpFileExplorer(Pyboard):
             None
 
         """
-        logging.info(f"write data to {dst}")
+        logging.info(f"write data to {self._fqn(dst)}")
         try:
 
             self.exec_("f = open('%s', 'wb')" % self._fqn(dst))
@@ -384,9 +384,9 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def put(self, src, dst=None):
-        logging.info(f'put {src} to remote {dst}')
+        logging.info(f'put {src} to remote {self._fqn(dst)}')
 
-        cache_value = self.md5_varifier.varify_sign(src, dst)
+        cache_value = self.md5_varifier.varify_sign(src, self._fqn(dst))
         if cache_value:
             f = open(src, "rb")
             data = f.read()
@@ -404,7 +404,10 @@ class MpFileExplorer(Pyboard):
         try:
 
             find = re.compile(pat)
-            files = Path(src_dir).glob('*')
+            if pat == '.*':  # 仅在.*时递归上传，否则，仅上传当前目录下文件
+                files = Path(src_dir).rglob('*')
+            else:
+                files = Path(src_dir).glob('*')
 
             for f in files:
                 if find.match(str(f)):
@@ -511,8 +514,13 @@ class MpFileExplorer(Pyboard):
         """
         logging.info(f'get remote file {src} to local {dst}')
 
-        if varify and src not in self.ls(add_details=True):
-            raise RemoteIOError("No such file or directory: '%s'" % self._fqn(src))
+        if varify:
+            files = self.ls(add_details=True)
+            file_names = [i[0] for i in files]
+            if src not in file_names:
+                print(f'src: {src}')
+                print(f'files: {file_names}')
+                raise RemoteIOError("No such file or directory: '%s'" % self._fqn(src))
 
         if dst is None:
             dst = src
@@ -534,6 +542,7 @@ class MpFileExplorer(Pyboard):
                 self.__mkdir_local(str(Path(dst).parent))
             with open(dst, 'wb') as fp:
                 fp.write(binascii.unhexlify(ret))
+                print(f'download {src} success')
 
     def mget(self, dst_dir, pat, verbose=False):
         logging.info(f'mget {dst_dir} {pat}')

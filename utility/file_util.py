@@ -24,12 +24,13 @@ class MD5Varifier:
         Returns:
 
         """
-        if cache_data == b'':
+        if cache_data == b'' or cache_data == b'0d0a':
             return
         file_info = binascii.a2b_hex(cache_data).decode('utf-8')  # 字符串
 
         for line_ in file_info.strip().split('\r\n'):
-            self._cache.update(eval(line_))
+            if line_:
+                self._cache.update(eval(line_))
 
     def _update_cache_file(self) -> bytes:
         """
