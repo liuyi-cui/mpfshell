@@ -102,6 +102,7 @@ class Pyboard:
 
     def get_board_info(self):
         board_model_pattern = r'MicroPython board with (\w+)'
+        esp_module_pattern = r'ESP module with (\w+)'
         board_model = None
         for i in range(8):
             time.sleep(0.1)
@@ -124,6 +125,10 @@ class Pyboard:
             ret = re.search(board_model_pattern, data.decode('utf-8'))
             if ret:
                 board_model = ret.group(1)
+            else:
+                ret = re.search(esp_module_pattern, data.decode('utf-8'))
+                if ret:
+                    board_model = ret.group(1)
         return board_model
 
     def enter_raw_repl(self):

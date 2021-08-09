@@ -85,6 +85,7 @@ class MpFileExplorer(Pyboard):
         self.reset = reset
         self.md5_varifier = MD5Varifier()
         self._os_lib = os_lib
+        self._exec_tool = 'shell'
 
         try:
             Pyboard.__init__(self, self.__con_from_str(constr))
@@ -187,6 +188,8 @@ class MpFileExplorer(Pyboard):
         if board_model == 'stm32l401':
             self._os_lib = 'uos'
             logging.info('Set os lib is uos on board')
+        elif board_model == 'ESP8266':
+            self._exec_tool = 'repl'
 
         self.enter_raw_repl()
         if self._os_lib == 'uos':

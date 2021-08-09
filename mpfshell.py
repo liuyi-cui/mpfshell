@@ -665,6 +665,14 @@ class MpFileShell(cmd.Cmd):
             self.__error("Missing arguments: <REMOTE .PY FILE>")
         if not args.endswith('.py'):
             self.__error("Remote file must be a python executable file")
+        if self.fe._exec_tool == 'repl':
+            try:
+                self.do_repl("exec(open('{0}').read())\r\n".format(args))
+            except Exception as e:
+                raise e
+            else:
+                return
+
         command = f'mpy {args}'
         try:
             command_data = self.fe.exec_command_in_shell(command)
