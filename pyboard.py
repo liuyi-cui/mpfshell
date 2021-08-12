@@ -224,7 +224,7 @@ class Pyboard:
         return ret
 
     def exec_(self, command):
-        logging.info(f'execute command {command}')
+        logging.debug(f'execute command {command}')
         ret, ret_err = self.exec_raw(command)
         if ret_err:
             raise PyboardError('exception', ret, ret_err)

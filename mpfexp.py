@@ -423,6 +423,9 @@ class MpFileExplorer(Pyboard):
                         if verbose:
                             print(f" * put {str(f)}")
                         self.__mkdir_remote(str(f))
+                        child_files = Path(f).rglob('*')
+                        for file_ in child_files:
+                            self.put(str(file_))
 
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
