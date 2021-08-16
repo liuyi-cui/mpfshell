@@ -90,18 +90,15 @@ class MD5Varifier:
             sign = self.md5_sign(fp.read())
         if not self._cache.get(file_path_remote):
             logging.info(f'{file_path_remote}: There is no signatures before')
-            print(f'{file_path_remote}: There is no signatures before')
             self._cache.update({file_path_remote: sign})
             return self._update_cache_file()
         sign_ori = self._cache.get(file_path_remote)
         if sign_ori != sign:
             logging.info('The old and new signatures are inconsistent, update')
-            print('The old and new signatures are inconsistent, update')
             self._cache.update({file_path_remote: sign})
             return self._update_cache_file()
         else:
             logging.info('The new signatures is same as the old, don`t updte')
-            print('The new signatures is same as the old, don`t updte')
             return False
 
     def rm_sign(self, file_path_remote) -> bytes:

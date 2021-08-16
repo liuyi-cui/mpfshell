@@ -402,7 +402,7 @@ class MpFileExplorer(Pyboard):
             self._do_write_remote(self.md5_varifier.cache_file, cache_value)
 
     def mput(self, src_dir, pat, verbose=False):
-        logging.info(f'mput {src_dir} {pat}')
+        logging.info(f'mput {src_dir} {pat}')  # src_dir就是work_path
 
         try:
 
@@ -410,7 +410,7 @@ class MpFileExplorer(Pyboard):
             if pat == '.*':  # 仅在.*时递归上传，否则，仅上传当前目录下文件
                 files = Path(src_dir).rglob('*')
             else:
-                files = Path(src_dir).glob('*')
+                files = Path(src_dir).glob('*')  # .nv文件
 
             for f in files:
                 if find.match(str(f)):
@@ -418,14 +418,17 @@ class MpFileExplorer(Pyboard):
                         if verbose:
                             print(" * put %s" % str(f))
 
-                        self.put(str(f))
+                        self.put(str(f.absolute()), f.name)  # dst应该是相对于当前开发板开发目录的相对路径
                     elif f.is_dir():
                         if verbose:
                             print(f" * put {str(f)}")
-                        self.__mkdir_remote(str(f))
+                        remote_file_path = f.name
+                        self.__mkdir_remote(remote_file_path)
+                        self.cd(remote_file_path)
                         child_files = Path(f).rglob('*')
                         for file_ in child_files:
-                            self.put(str(file_))
+                            self.put(str(file_.absolute()), file_.name)
+                        self.cd('..')
 
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
@@ -483,19 +486,21 @@ class MpFileExplorer(Pyboard):
         Path(remote_dir).mkdir(exist_ok=True)
 
     def __mkdir_remote(self, local_dir):
-        tmp_dirs = Path(local_dir).parts  # 仅使用与windows环境
-        logging.info(f"local_dir: {local_dir}")
-        logging.info(f"tmp_dirs: {tmp_dirs}")
+        """
+
+        Args:
+            local_dir: 本地文件夹的相对路径
+            work_path: 本地文件夹的工作目录。工作目录拼接相对路径即为绝对路径
+
+        Returns:
+
+        """
+        tmp_dirs = Path(local_dir).parts  # 仅适用于windows环境
         if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
-            cur_dir = os.getcwd()
-            logging.info(f"cur_dir: {cur_dir}")
-            local_dir = local_dir[len(cur_dir)+1:]
-            dirs = Path(local_dir).parts
-            logging.info(f"dirs: {dirs}")
             dir_index = 0
             ori_dir = ''
-            while dir_index < len(dirs):
-                cur_dir = str(Path(ori_dir, dirs[dir_index]))
+            while dir_index < len(tmp_dirs):
+                cur_dir = str(Path(ori_dir, tmp_dirs[dir_index]))
                 try:
                     self.md(cur_dir)
                 except Exception as e:
@@ -633,6 +638,8 @@ class MpFileExplorer(Pyboard):
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def md(self, target):
         logging.info(f'mkdir {target}')
+        if len(Path(target).parts) > 1:
+            self.__mkdir_remote(target)
 
         try:
 
@@ -752,30 +759,27 @@ class MpFileExplorerCaching(MpFileExplorer):
         return files
 
     def put(self, src, dst=None):
+        logging.info(f'src: {src}')
+        logging.info(f'dst: {dst}')
 
-        tmp_dirs = Path(src).parts  # 仅使用与windows环境
-        logging.info(f"src: {src}")
+        if os.path.isdir(src):
+            self.md(dst)
+            return
+        tmp_dirs = Path(dst).parts
         logging.info(f"tmp_dirs: {tmp_dirs}")
         if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
-            cur_dir = os.getcwd()
+            cur_dir = dst
             logging.info(f"cur_dir: {cur_dir}")
-            src = src[len(cur_dir)+1:]
-            dirs = Path(src).parts
-            logging.info(f"dirs: {dirs}")
             dir_index = 0
             ori_dir = ''
-            while dir_index < len(dirs) - 1:
-                cur_dir = str(Path(ori_dir, dirs[dir_index]))
+            while dir_index < len(tmp_dirs) - 1:
+                cur_dir = str(Path(ori_dir, tmp_dirs[dir_index]))
                 try:
                     self.md(cur_dir)
                 except Exception as e:
                     pass
                 dir_index += 1
                 ori_dir = cur_dir
-            if src.startswith(os.getcwd()):
-                dst = str(Path(cur_dir[len(os.getcwd()):], dirs[-1]))
-            else:
-                dst = src
         MpFileExplorer.put(self, src, dst)
 
         if dst is None:

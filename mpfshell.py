@@ -34,6 +34,7 @@ import logging
 import platform
 import re
 import time
+from pathlib import Path
 
 import version
 from mpfexp import MpFileExplorer
@@ -405,47 +406,66 @@ class MpFileShell(cmd.Cmd):
     def do_put(self, args):
         """put <LOCAL FILE> [<REMOTE FILE>]
         Upload local file. If the second parameter is given,
+        its value is used for local work path.
+        If the third parameter is given,
         its value is used for the remote file name. Otherwise the
         remote file will be named the same as the local file.
         """
 
         if not len(args):
-            self.__error("Missing arguments: <LOCAL FILE> [<REMOTE FILE>]")
+            self.__error("Missing arguments: <LOCAL FILE> [<LOCAL WORKPATH>] [<REMOTE FILE>]")
 
         elif self.__is_open():
 
             s_args = self.__parse_file_names(args)
             if not s_args:
                 return
-            elif len(s_args) > 2:
-                self.__error("Only one ore two arguments allowed: <LOCAL FILE> [<REMOTE FILE>]")
+            elif len(s_args) > 3:
+                self.__error("Only one ore two or three arguments allowed: <LOCAL FILE> [<LOCAL WORKPATH>]"
+                             "[<REMOTE FILE>]")
                 return
 
-            lfile_name = s_args[0]
-
-            if len(s_args) > 1:
-                rfile_name = s_args[1]
+            if len(s_args) == 3:  # 需要约定好，put携带的路径参数，文件为相对路径，工作路径为绝对路径
+                rfile_name = s_args[2]
+                work_path = s_args[1]
+                if not s_args[0].startswith(work_path):
+                    lfile_name = os.path.join(work_path, s_args[0])
+                else:
+                    lfile_name = s_args[0]
+            elif len(s_args) == 2:
+                rfile_name = s_args[0]
+                work_path = s_args[1]
+                if not rfile_name.startswith(work_path):
+                    lfile_name = os.path.join(work_path, s_args[0])
+                else:
+                    lfile_name = s_args[0]
             else:
-                rfile_name = lfile_name
+                lfile_name, rfile_name = s_args[0]
+                work_path = None
+                if not lfile_name.startswith(os.getcwd()):
+                    lfile_name = os.path.join(os.getcwd(), s_args[0])
+
             try:
                 if os.path.isdir(lfile_name):
                     print(" <dir> %s" % lfile_name)
-                    local = os.getcwd() # backup
+                    local = os.getcwd()  # backup
                     remote = self.fe.pwd()
                     try:
                         # make dir in remote
-                        self.fe.md(lfile_name)
+                        self.fe.md(rfile_name)
                     except Exception as e:
-                        pass
-                        # print(e)
-                    self.fe.cd(lfile_name)
+                        logging.error(e)
+                    # self.fe.cd(rfile_name)
                     # cd dir get files to put
                     os.chdir(lfile_name)
-                    for f in os.listdir("."):
-                        if os.path.isfile(f):
-                            self.fe.put(f, f)
+                    for f in Path().rglob('*'):
+                        file_path = str(f.absolute())[len(work_path)+1:]
+                        if f.is_dir():
+                            self.fe.md(os.path.join(rfile_name, f))
+                        else:
+                            self.fe.put(str(f.absolute()), file_path)
                     self.fe.cd(remote)
-                    os.chdir(local) # restore
+                    os.chdir(local)
 
                 if os.path.isfile(lfile_name):
                     print("       %s" % lfile_name)
@@ -467,13 +487,20 @@ class MpFileShell(cmd.Cmd):
         "mput" does not get directories, and it is not recursive.
         """
 
-        if not len(args):
-            self.__error("Missing argument: <SELECTION REGEX>")
+        if not args:
+            self.__error("MISSING arguments: <SELECTION REGEX> <WORKPATH>")
+        s_args = self.__parse_file_names(args)
+        if len(s_args) != 2:
+            self.__error("Must have two arguments: <SELECTION REGEX> <WORKPATH>")
 
         elif self.__is_open():
+            pattern = s_args[0]
+            work_path = s_args[1]
+            print(work_path)
+            print(pattern)
 
             try:
-                self.fe.mput(os.getcwd(), args, True)
+                self.fe.mput(work_path, pattern, True)
             except IOError as e:
                 self.__error(str(e))
             except Exception as e:
