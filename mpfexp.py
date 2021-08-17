@@ -1,4 +1,4 @@
-##
+# -*- coding: utf-8 -*-
 # The MIT License (MIT)
 #
 # Copyright (c) 2016 Stefan Wendler
@@ -160,7 +160,9 @@ class MpFileExplorer(Pyboard):
 
     def _fqn(self, name):
         # print(name, posixpath.join(self.dir, name).replace("\\","/"))
-        return posixpath.join(self.dir, name).replace("\\","/")
+        if not name.startswith('\\'):
+            return posixpath.join(self.dir, name).replace("\\","/")
+        return name.replace('\\', '/')
 
     def __set_sysname(self):
         self.sysname = sys.platform
@@ -385,10 +387,17 @@ class MpFileExplorer(Pyboard):
             else:
                 raise e
 
-    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def put(self, src, dst=None):
-        logging.info(f'put {src} to remote {self._fqn(dst)}')
+    def _put_file(self, src, dst) -> None:
+        """
+        upload local file to remote
+        Args:
+            src:
+            dst:
 
+        Returns:
+            None
+
+        """
         cache_value = self.md5_varifier.varify_sign(src, self._fqn(dst))
         if cache_value:
             f = open(src, "rb")
@@ -398,40 +407,25 @@ class MpFileExplorer(Pyboard):
             if dst is None:
                 dst = src
 
-            self._do_write_remote(dst, data, verbose=True)
+            self._do_write_remote(dst, data)
             self._do_write_remote(self.md5_varifier.cache_file, cache_value)
 
-    def mput(self, src_dir, pat, verbose=False):
-        logging.info(f'mput {src_dir} {pat}')  # src_dir就是work_path
+    @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
+    def put(self, src: str, dst: str):
+        """
+        upload local file/folder to reomte
+        Args:
+            src: local file path
+            dst: remote file path relative to the current working path of the development board
 
-        try:
+        Returns: None
 
-            find = re.compile(pat)
-            if pat == '.*':  # 仅在.*时递归上传，否则，仅上传当前目录下文件
-                files = Path(src_dir).rglob('*')
-            else:
-                files = Path(src_dir).glob('*')  # .nv文件
-
-            for f in files:
-                if find.match(str(f)):
-                    if f.is_file():
-                        if verbose:
-                            print(" * put %s" % str(f))
-
-                        self.put(str(f.absolute()), f.name)  # dst应该是相对于当前开发板开发目录的相对路径
-                    elif f.is_dir():
-                        if verbose:
-                            print(f" * put {str(f)}")
-                        remote_file_path = f.name
-                        self.__mkdir_remote(remote_file_path)
-                        self.cd(remote_file_path)
-                        child_files = Path(f).rglob('*')
-                        for file_ in child_files:
-                            self.put(str(file_.absolute()), file_.name)
-                        self.cd('..')
-
-        except sre_constants.error as e:
-            raise RemoteIOError("Error in regular expression: %s" % e)
+        """
+        logging.info(f'put {src} to remote {self._fqn(dst)}')
+        if os.path.isdir(src):
+            self.md(dst, varify=False)
+        elif os.path.isfile(src):
+            self._put_file(src, dst)
 
     def _do_read_remote(self, dst: str) -> bytes:
         """
@@ -496,6 +490,8 @@ class MpFileExplorer(Pyboard):
 
         """
         tmp_dirs = Path(local_dir).parts  # 仅适用于windows环境
+        if tmp_dirs[0] == '\\':
+            tmp_dirs = tmp_dirs[1:]
         if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
             dir_index = 0
             ori_dir = ''
@@ -636,9 +632,13 @@ class MpFileExplorer(Pyboard):
         return self.dir
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def md(self, target):
+    def md(self, target, varify=True):
+        print(f'create dir {self._fqn(target)}')
         logging.info(f'mkdir {target}')
-        if len(Path(target).parts) > 1:
+        parts = Path(target).parts
+        if parts[0] == '\\':
+            parts = parts[1:]
+        if varify and len(parts) > 1:
             self.__mkdir_remote(target)
 
         try:
@@ -758,38 +758,17 @@ class MpFileExplorerCaching(MpFileExplorer):
 
         return files
 
-    def put(self, src, dst=None):
+    def put(self, src, dst):
         logging.info(f'src: {src}')
         logging.info(f'dst: {dst}')
 
-        if os.path.isdir(src):
-            self.md(dst)
-            return
-        tmp_dirs = Path(dst).parts
-        logging.info(f"tmp_dirs: {tmp_dirs}")
-        if len(tmp_dirs) > 1:  # 绝对路径，需要检查开发板上是否有对应的文件夹
-            cur_dir = dst
-            logging.info(f"cur_dir: {cur_dir}")
-            dir_index = 0
-            ori_dir = ''
-            while dir_index < len(tmp_dirs) - 1:
-                cur_dir = str(Path(ori_dir, tmp_dirs[dir_index]))
-                try:
-                    self.md(cur_dir)
-                except Exception as e:
-                    pass
-                dir_index += 1
-                ori_dir = cur_dir
         MpFileExplorer.put(self, src, dst)
-
-        if dst is None:
-            dst = src
 
         self.__update_cache(dst, 'add', 'file')
 
-    def md(self, dir_):
+    def md(self, dir_, varify=True):
 
-        MpFileExplorer.md(self, dir_)
+        MpFileExplorer.md(self, dir_, varify)
         self.__update_cache(dir_, 'add', 'dir')
 
     def rm(self, target):

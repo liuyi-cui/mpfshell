@@ -3,7 +3,6 @@
 import binascii
 import hashlib
 import logging
-from pathlib import Path
 
 
 class MD5Varifier:
@@ -117,3 +116,20 @@ class MD5Varifier:
             if file_path_remote in self._cache:
                 self._cache.pop(file_path_remote)
         return self._update_cache_file()
+
+
+def get_file_size(file_path):
+    """
+
+    Args:
+        file_path: str/Path
+
+    Returns:
+        size of bytes
+
+    """
+    try:
+        with open(file_path, 'rb') as fp:
+            return len(fp.read())
+    except Exception as e:
+        raise e

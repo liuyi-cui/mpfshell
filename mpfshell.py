@@ -43,6 +43,7 @@ from mpfexp import RemoteIOError
 from pyboard import PyboardError
 from conbase import ConError
 from tokenizer import Tokenizer
+from utility.file_util import get_file_size
 
 
 class MpFileShell(cmd.Cmd):
@@ -403,8 +404,61 @@ class MpFileShell(cmd.Cmd):
 
         print(os.getcwd())
 
+    def __put_dir(self, src, dst, varify=True):
+        remote = self.fe.pwd()
+        try:
+            try:
+                self.fe.md(dst, varify=varify)
+            except Exception as e:
+                pass
+            self.fe.cd(dst)
+        except Exception as e:
+            logging.error(e)
+        for f in Path(src).rglob('*'):
+            if f.is_dir():
+                self.fe.md(str(f.absolute())[len(src)+1:], varify=False)
+        self.fe.cd(remote)
+
+    def _do_put(self, lfile_name, work_path, rfile_name, varify=True):
+        """
+
+        Args:
+            lfile_name: local absolute path
+            work_path: local absolute path
+            rfile_name: remote relative path
+
+        Returns:
+
+        """
+        logging.warning(f'do put {lfile_name} {work_path} {rfile_name}')
+        try:
+            if os.path.isdir(lfile_name):
+                self.__put_dir(lfile_name, rfile_name, varify=varify)
+                files = [str(f.absolute()) for f in Path(lfile_name).rglob('*') if f.is_file()]
+                nums = len(files)
+                num_cur = 1
+                for file in files:
+                    relative_path = file[len(work_path) + 1:]
+                    remote_relative_path = relative_path.replace(lfile_name[len(work_path) + 1:], rfile_name)
+                    file_size = get_file_size(file)
+                    print(f'[{num_cur}/{nums}] Writing file {relative_path}({file_size // 1024 + 1}kb)')
+                    self.fe.put(str(file), remote_relative_path)
+                    num_cur += 1
+                print('Upload done')
+            elif os.path.isfile(lfile_name):
+                file_size = get_file_size(lfile_name)
+                print(f'[1/1] Writing file {lfile_name[len(work_path) + 1:]}({file_size // 1024 + 1}kb)')
+                self.fe.put(lfile_name, rfile_name)
+                print('Upload done')
+            else:
+                print(f'There is no file or path {lfile_name}')
+        except IOError as e:
+            self.__error(str(e))
+        except Exception as e:
+            print(e)
+
     def do_put(self, args):
-        """put <LOCAL FILE> [<REMOTE FILE>]
+        """put <LOCAL FILE> [<LOCAL WORKPATH>] [<REMOTE FILE>]
         Upload local file. If the second parameter is given,
         its value is used for local work path.
         If the third parameter is given,
@@ -443,37 +497,9 @@ class MpFileShell(cmd.Cmd):
                 lfile_name, rfile_name = s_args[0]
                 work_path = None
                 if not lfile_name.startswith(os.getcwd()):
-                    lfile_name = os.path.join(os.getcwd(), s_args[0])
+                    lfile_name = os.path.join(os.getcwd(), lfile_name)
 
-            try:
-                if os.path.isdir(lfile_name):
-                    print(" <dir> %s" % lfile_name)
-                    local = os.getcwd()  # backup
-                    remote = self.fe.pwd()
-                    try:
-                        # make dir in remote
-                        self.fe.md(rfile_name)
-                    except Exception as e:
-                        logging.error(e)
-                    # self.fe.cd(rfile_name)
-                    # cd dir get files to put
-                    os.chdir(lfile_name)
-                    for f in Path().rglob('*'):
-                        file_path = str(f.absolute())[len(work_path)+1:]
-                        if f.is_dir():
-                            self.fe.md(os.path.join(rfile_name, f))
-                        else:
-                            self.fe.put(str(f.absolute()), file_path)
-                    self.fe.cd(remote)
-                    os.chdir(local)
-
-                if os.path.isfile(lfile_name):
-                    print("       %s" % lfile_name)
-                    self.fe.put(lfile_name, rfile_name)           
-            except IOError as e:
-                self.__error(str(e))
-            except Exception as e:
-                print(e)
+            self._do_put(lfile_name, work_path, rfile_name)
 
     def complete_put(self, *args):
         files = [o for o in os.listdir(".") if os.path.isfile(os.path.join(".", o))]
@@ -488,23 +514,28 @@ class MpFileShell(cmd.Cmd):
         """
 
         if not args:
-            self.__error("MISSING arguments: <SELECTION REGEX> <WORKPATH>")
+            self.__error("MISSING arguments: <SELECTION REGEX> <WORKPATH> <REMOTE PATH>")
         s_args = self.__parse_file_names(args)
-        if len(s_args) != 2:
-            self.__error("Must have two arguments: <SELECTION REGEX> <WORKPATH>")
 
-        elif self.__is_open():
+        if self.__is_open():
             pattern = s_args[0]
-            work_path = s_args[1]
-            print(work_path)
-            print(pattern)
+            work_path = os.getcwd()
+            remote_path = None
+            if len(s_args) >= 2:
+                work_path = s_args[1]
+            if len(s_args) >= 3:
+                remote_path = s_args[2]
 
-            try:
-                self.fe.mput(work_path, pattern, True)
-            except IOError as e:
-                self.__error(str(e))
-            except Exception as e:
-                print(e)
+            files = Path(work_path).glob('*')
+            compiler = re.compile(pattern)
+            for file in files:
+                if compiler.match(str(file)):
+                    if remote_path is None:
+                        rfile_name = file.name
+                    else:
+                        rfile_name = remote_path
+                        rfile_name = f'{rfile_name}/{file.name}'
+                    self._do_put(str(file.absolute()), work_path, rfile_name, varify=False)
 
     def do_get(self, args):
         """get <REMOTE FILE> [<LOCAL FILE>]
