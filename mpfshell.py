@@ -34,6 +34,7 @@ import logging
 import platform
 import re
 import time
+import json
 from pathlib import Path
 
 import version
@@ -48,6 +49,8 @@ from utility.file_util import get_file_size
 
 class MpFileShell(cmd.Cmd):
 
+    STATE_FILE = 'state_temp.json'
+
     def __init__(self, color=False, caching=False, reset=False, help=False):
         cmd.Cmd.__init__(self)
 
@@ -58,6 +61,7 @@ class MpFileShell(cmd.Cmd):
         self.fe = None
         self.repl = None
         self.tokenizer = Tokenizer()
+        self.port = None  # 记录端口号
 
         if platform.system() == 'Windows':
             self.use_rawinput = False
@@ -176,6 +180,17 @@ class MpFileShell(cmd.Cmd):
 
         return None
 
+    def __update_state(self, file_name=STATE_FILE, state='mpfshell'):
+        state = {self.port: state}
+        if os.path.exists(file_name):
+            with open(file_name, 'r') as fp:
+                state_intact = json.load(fp)
+            state_intact.update(state)
+        else:
+            state_intact = state
+        with open(file_name, 'w') as fp:
+            json.dump(state_intact, fp, indent=4)
+
     def all_serial(self):
         import serial.tools.list_ports
         print("looking for all port...")
@@ -246,8 +261,10 @@ class MpFileShell(cmd.Cmd):
                     args = "ser:/dev/" + args
 
             self.open_args = args
+            self.port = args
 
             self.__connect(args)
+            self.__update_state()
 
     def complete_open(self, *args):
         ports = glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*')
@@ -845,6 +862,7 @@ class MpFileShell(cmd.Cmd):
 
             self.fe.teardown()
             self.repl.start()
+            self.__update_state(state='repl')
 
             if self.repl.exit_character == chr(0x11):
                 print("\n*** Exit REPL with Ctrl+Q ***")
@@ -862,6 +880,7 @@ class MpFileShell(cmd.Cmd):
             self.repl.console.cleanup()
 
             self.fe.setup()
+            self.__update_state(state='mpfshell')
             print("")
 
     def do_mpyc(self, args):
