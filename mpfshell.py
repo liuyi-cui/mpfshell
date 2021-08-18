@@ -579,12 +579,18 @@ class MpFileShell(cmd.Cmd):
         """
 
         if not len(args):
-            self.__error("Missing argument: <SELECTION REGEX>")
+            self.__error("Missing argument: <SELECTION REGEX> [<LOCAL PATH>]")
 
         elif self.__is_open():
+            s_args = self.__parse_file_names(args)
+            if len(s_args) >= 1:
+                pattern = s_args[0]
+                local_path = os.getcwd()
+            if len(s_args) >= 2:
+                local_path = s_args[1]
 
             try:
-                self.fe.mget(os.getcwd(), args, True)
+                self.fe.mget(local_path, pattern, True)
             except IOError as e:
                 self.__error(str(e))
             except Exception as e:
