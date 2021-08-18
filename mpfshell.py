@@ -68,7 +68,7 @@ class MpFileShell(cmd.Cmd):
         self.__intro()
         self.__set_prompt_path()
 
-        if help is False:
+        if help is True:
             self.do_help(None)
             print("can input help ls or other command if you don't know how to use it.")
 
@@ -87,9 +87,9 @@ class MpFileShell(cmd.Cmd):
 
     def __intro(self):
 
-        self.intro = '\n** Micropython File Shell v%s, sw@kaltpost.de & junhuanchen@qq.com **\n' % version.FULL
+        # self.intro = '\n** Micropython File Shell v%s, sw@kaltpost.de & junhuanchen@qq.com **\n' % version.FULL
 
-        self.intro += '-- Running on Python %d.%d using PySerial %s --\n' \
+        self.intro = '-- Running on Python %d.%d using PySerial %s --\n' \
                       % (sys.version_info[0], sys.version_info[1], serial.VERSION)
 
     def __set_prompt_path(self):
