@@ -515,7 +515,7 @@ class MpFileShell(cmd.Cmd):
                 else:
                     lfile_name = s_args[0]
             else:
-                lfile_name, rfile_name = s_args[0]
+                lfile_name, rfile_name = s_args[0], s_args[0]
                 work_path = None
                 if not lfile_name.startswith(os.getcwd()):
                     lfile_name = os.path.join(os.getcwd(), lfile_name)

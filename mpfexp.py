@@ -536,14 +536,15 @@ class MpFileExplorer(Pyboard):
             ret = self._do_read_remote(src)
         except Exception as e:
             if str(e).startswith('Failed to read file'):  # src为文件夹路径
-                self.__mkdir_local(src)
+                self.__mkdir_local(dst)
                 tmp_files = self.__list_dir(self._fqn(src))
                 files = ast.literal_eval(tmp_files.decode('utf-8'))
                 logging.info(f"get listdir of {src} is {files}")
                 if files:
                     for file in files:
-                        file_path = f"{src}/{file}"  # TODO 系统的路径拼接为\，因此手动拼接
-                        self.get(file_path, None, False)
+                        file_path = f"{src}/{file}"  # 开发板的路径拼接不同于windows，因此手动拼接
+                        child_dst = os.path.join(dst, file)
+                        self.get(file_path, child_dst, False)
         else:
             if not Path(dst).parent.exists():
                 self.__mkdir_local(str(Path(dst).parent))
