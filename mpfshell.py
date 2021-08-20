@@ -436,7 +436,7 @@ class MpFileShell(cmd.Cmd):
                 self.fe.md(str(f.absolute())[len(src)+1:], varify=False)
         self.fe.cd(remote)
 
-    def _do_put(self, lfile_name, work_path, rfile_name, varify=True):
+    def _do_put(self, lfile_name, work_path, rfile_name, varify=True, verbose=True):
         """
 
         Args:
@@ -458,15 +458,19 @@ class MpFileShell(cmd.Cmd):
                     relative_path = file[len(work_path) + 1:]
                     remote_relative_path = relative_path.replace(lfile_name[len(work_path) + 1:], rfile_name)
                     file_size = get_file_size(file)
-                    print(f'[{num_cur}/{nums}] Writing file {relative_path}({file_size // 1024 + 1}kb)')
+                    if verbose:
+                        print(f'[{num_cur}/{nums}] Writing file {relative_path}({file_size // 1024 + 1}kb)')
                     self.fe.put(str(file), remote_relative_path)
                     num_cur += 1
-                print('Upload done')
+                if verbose:
+                    print('Upload done')
             elif os.path.isfile(lfile_name):
                 file_size = get_file_size(lfile_name)
-                print(f'[1/1] Writing file {lfile_name[len(work_path) + 1:]}({file_size // 1024 + 1}kb)')
+                if verbose:
+                    print(f'[1/1] Writing file {lfile_name[len(work_path) + 1:]}({file_size // 1024 + 1}kb)')
                 self.fe.put(lfile_name, rfile_name)
-                print('Upload done')
+                if verbose:
+                    print('Upload done')
             else:
                 print(f'There is no file or path {lfile_name}')
         except IOError as e:
@@ -474,7 +478,7 @@ class MpFileShell(cmd.Cmd):
         except Exception as e:
             print(e)
 
-    def do_put(self, args):
+    def do_put(self, args, verbose=True):
         """put <LOCAL FILE> [<LOCAL WORKPATH>] [<REMOTE FILE>]
         Upload local file. If the second parameter is given,
         its value is used for local work path.
@@ -516,7 +520,8 @@ class MpFileShell(cmd.Cmd):
                 if not lfile_name.startswith(os.getcwd()):
                     lfile_name = os.path.join(os.getcwd(), lfile_name)
 
-            self._do_put(lfile_name, work_path, rfile_name)
+            self._do_put(lfile_name, work_path, rfile_name, verbose=verbose)
+            return rfile_name
 
     def complete_put(self, *args):
         files = [o for o in os.listdir(".") if os.path.isfile(os.path.join(".", o))]
@@ -718,18 +723,9 @@ class MpFileShell(cmd.Cmd):
 
         elif self.__is_open():
 
-            s_args = self.__parse_file_names(args)
-            if not s_args:
-                return
-            elif len(s_args) > 1:
-                self.__error("Only one ore one arguments allowed: <LOCAL FILE> ")
-                return
-
-            lfile_name = s_args[0]
-
             try:
-                self.fe.put(lfile_name, lfile_name)
-                self.do_ef(args)
+                remote_file = self.do_put(args, verbose=False)
+                self.do_ef(remote_file)
             except IOError as e:
                 self.__error(str(e))
             except Exception as e:
@@ -776,18 +772,8 @@ class MpFileShell(cmd.Cmd):
         """
         if self.__is_open():
 
-            s_args = self.__parse_file_names(args)
-            if not s_args:
-                return
-            elif len(s_args) > 1:
-                self.__error("Only one ore one arguments allowed: <LOCAL FILE> ")
-                return
-
-            lfile_name = s_args[0]
-
             try:
-                self.fe.put(lfile_name, lfile_name)
-
+                remote_file = self.do_put(args, verbose=False)
                 self.do_repl("exec(open('{0}').read())\r\n".format(args))
 
             except IOError as e:
