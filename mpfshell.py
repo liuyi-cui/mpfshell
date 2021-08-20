@@ -774,7 +774,7 @@ class MpFileShell(cmd.Cmd):
 
             try:
                 remote_file = self.do_put(args, verbose=False)
-                self.do_repl("exec(open('{0}').read())\r\n".format(args))
+                self.do_repl("exec(open('{0}').read())\r\n".format(remote_file))
 
             except IOError as e:
                 self.__error(str(e))
@@ -798,8 +798,6 @@ class MpFileShell(cmd.Cmd):
         elif self.__is_open():
 
             try:
-                args = args.replace("\'", "")
-                args = args.replace('\"', '')
                 self.fe.exec_raw_no_follow(args + "\n")
                 ret = self.fe.follow(1, data_consumer)
 
