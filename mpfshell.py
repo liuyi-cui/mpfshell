@@ -191,6 +191,41 @@ class MpFileShell(cmd.Cmd):
         with open(file_name, 'w') as fp:
             json.dump(state_intact, fp, indent=4)
 
+    def __parse_put_args(self, args):
+        if not len(args):
+            self.__error("Missing arguments: <LOCAL FILE> [<LOCAL WORKPATH>] [<REMOTE FILE>]")
+
+        elif self.__is_open():
+
+            s_args = self.__parse_file_names(args)
+            if not s_args:
+                return
+            elif len(s_args) > 3:
+                self.__error("Only one ore two or three arguments allowed: <LOCAL FILE> [<LOCAL WORKPATH>]"
+                             "[<REMOTE FILE>]")
+                return
+
+            if len(s_args) == 3:  # 需要约定好，put携带的路径参数，文件为相对路径，工作路径为绝对路径
+                rfile_name = s_args[2]
+                work_path = s_args[1]
+                if not s_args[0].startswith(work_path):
+                    lfile_name = os.path.join(work_path, s_args[0])
+                else:
+                    lfile_name = s_args[0]
+            elif len(s_args) == 2:
+                rfile_name = s_args[0]
+                work_path = s_args[1]
+                if not rfile_name.startswith(work_path):
+                    lfile_name = os.path.join(work_path, s_args[0])
+                else:
+                    lfile_name = s_args[0]
+            else:
+                lfile_name, rfile_name = s_args[0], s_args[0]
+                work_path = None
+                if not lfile_name.startswith(os.getcwd()):
+                    lfile_name = os.path.join(os.getcwd(), lfile_name)
+            return lfile_name, work_path, rfile_name
+
     def all_serial(self):
         import serial.tools.list_ports
         print("looking for all port...")
@@ -460,7 +495,7 @@ class MpFileShell(cmd.Cmd):
                     file_size = get_file_size(file)
                     if verbose:
                         print(f'[{num_cur}/{nums}] Writing file {relative_path}({file_size // 1024 + 1}kb)')
-                    self.fe.put(str(file), remote_relative_path)
+                    self.fe.put(str(file), remote_relative_path, verbose=not verbose)
                     num_cur += 1
                 if verbose:
                     print('Upload done')
@@ -468,7 +503,7 @@ class MpFileShell(cmd.Cmd):
                 file_size = get_file_size(lfile_name)
                 if verbose:
                     print(f'[1/1] Writing file {lfile_name[len(work_path) + 1:]}({file_size // 1024 + 1}kb)')
-                self.fe.put(lfile_name, rfile_name)
+                self.fe.put(lfile_name, rfile_name, verbose=not verbose)
                 if verbose:
                     print('Upload done')
             else:
@@ -487,41 +522,10 @@ class MpFileShell(cmd.Cmd):
         remote file will be named the same as the local file.
         """
 
-        if not len(args):
-            self.__error("Missing arguments: <LOCAL FILE> [<LOCAL WORKPATH>] [<REMOTE FILE>]")
-
-        elif self.__is_open():
-
-            s_args = self.__parse_file_names(args)
-            if not s_args:
-                return
-            elif len(s_args) > 3:
-                self.__error("Only one ore two or three arguments allowed: <LOCAL FILE> [<LOCAL WORKPATH>]"
-                             "[<REMOTE FILE>]")
-                return
-
-            if len(s_args) == 3:  # 需要约定好，put携带的路径参数，文件为相对路径，工作路径为绝对路径
-                rfile_name = s_args[2]
-                work_path = s_args[1]
-                if not s_args[0].startswith(work_path):
-                    lfile_name = os.path.join(work_path, s_args[0])
-                else:
-                    lfile_name = s_args[0]
-            elif len(s_args) == 2:
-                rfile_name = s_args[0]
-                work_path = s_args[1]
-                if not rfile_name.startswith(work_path):
-                    lfile_name = os.path.join(work_path, s_args[0])
-                else:
-                    lfile_name = s_args[0]
-            else:
-                lfile_name, rfile_name = s_args[0], s_args[0]
-                work_path = None
-                if not lfile_name.startswith(os.getcwd()):
-                    lfile_name = os.path.join(os.getcwd(), lfile_name)
-
+        put_args = self.__parse_put_args(args)
+        if put_args:
+            lfile_name, work_path, rfile_name = put_args
             self._do_put(lfile_name, work_path, rfile_name, verbose=verbose)
-            return rfile_name
 
     def complete_put(self, *args):
         files = [o for o in os.listdir(".") if os.path.isfile(os.path.join(".", o))]
@@ -724,8 +728,11 @@ class MpFileShell(cmd.Cmd):
         elif self.__is_open():
 
             try:
-                remote_file = self.do_put(args, verbose=False)
-                self.do_ef(remote_file)
+                put_args = self.__parse_put_args(args)
+                if put_args:
+                    lfile_name, work_path, rfile_name = put_args
+                    self._do_put(lfile_name, work_path, rfile_name, verbose=False)
+                    self.do_ef(rfile_name)
             except IOError as e:
                 self.__error(str(e))
             except Exception as e:
@@ -773,8 +780,11 @@ class MpFileShell(cmd.Cmd):
         if self.__is_open():
 
             try:
-                remote_file = self.do_put(args, verbose=False)
-                self.do_repl("exec(open('{0}').read())\r\n".format(remote_file))
+                put_args = self.__parse_put_args(args)
+                if put_args:
+                    lfile_name, work_path, rfile_name = put_args
+                    self._do_put(lfile_name, work_path, rfile_name)
+                    self.do_repl("exec(open('{0}').read())\r\n".format(rfile_name))
 
             except IOError as e:
                 self.__error(str(e))
@@ -898,6 +908,14 @@ class MpFileShell(cmd.Cmd):
         return [i for i in files if i.startswith(args[0])]
 
     def do_rmrf(self, target):
+        """
+        删除目录树
+        Args:
+            target: 文件名或文件夹名称
+
+        Returns:
+
+        """
         if not len(target):
             self.__error("Missing argument: <REMOTE DIR>")
 
@@ -911,6 +929,14 @@ class MpFileShell(cmd.Cmd):
                 print(e)
 
     def do_mrmrf(self, args):
+        """
+        批量删除目录树
+        Args:
+            args: 目变文件(夹)名称的正则表达式
+
+        Returns:
+
+        """
         if not len(args):
             self.__error("Missing argument: <SELECT REGEX>")
 
@@ -922,6 +948,22 @@ class MpFileShell(cmd.Cmd):
                 self.__error(str(e))
             except Exception as e:
                 print(e)
+
+    def do_synchronize(self, args):
+        """
+        同步目录
+        Args:
+            args: 同do_put
+
+        Returns:
+
+        """
+        put_args = self.__parse_put_args(args)
+        if put_args:
+            lfile_name, work_path, rfile_name = put_args
+            self._do_put(lfile_name, work_path, rfile_name, verbose=False)
+            self.fe.synchronize(lfile_name, rfile_name)
+            print('Synchronize done\n')
 
 
 def main():

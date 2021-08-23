@@ -74,12 +74,13 @@ class MD5Varifier:
         logging.info(f'add sign: {file_path}:{sign}')
         return self._update_cache_file()
 
-    def varify_sign(self, file_path, file_path_remote):
+    def varify_sign(self, file_path, file_path_remote, verbose=False):
         """
         varify sign bettwen file_path and file_path_remote
         Args:
             file_path: new file, get sign by generate
             file_path_remote: old file, get sign from cache_file
+            verbose: if print detail info
 
         Returns:
 
@@ -87,14 +88,18 @@ class MD5Varifier:
         logging.info(f'varify file: {file_path}[local] -- {file_path_remote}[remote]')
         with open(file_path, 'rb') as fp:
             sign = self.md5_sign(fp.read())
-        if not self._cache.get(file_path_remote):
+        if not self._cache.get(file_path_remote):  # first upload
             logging.info(f'{file_path_remote}: There is no signatures before')
             self._cache.update({file_path_remote: sign})
+            if verbose:
+                print(f' * add {file_path_remote}')
             return self._update_cache_file()
         sign_ori = self._cache.get(file_path_remote)
-        if sign_ori != sign:
+        if sign_ori != sign:  # update
             logging.info('The old and new signatures are inconsistent, update')
             self._cache.update({file_path_remote: sign})
+            if verbose:
+                print(f' * update {file_path_remote}')
             return self._update_cache_file()
         else:
             logging.info('The new signatures is same as the old, don`t updte')
@@ -116,6 +121,11 @@ class MD5Varifier:
             if file_path_remote in self._cache:
                 self._cache.pop(file_path_remote)
         return self._update_cache_file()
+
+    def get_filename_by_suffix(self, filename_suffix):
+        files = [filename for filename, sign in self._cache.items()
+                 if filename.startswith(filename_suffix)]
+        return files
 
 
 def get_file_size(file_path):

@@ -325,9 +325,9 @@ class MpFileExplorer(Pyboard):
                     if self.sysname == "WiPy":
                         raise RemoteIOError("No such file or directory or directory not empty: %s" % target)
                     else:
-                        raise RemoteIOError("No such file or directory: %s" % target)
+                        raise RemoteIOError("No such file or directory: %s" % self._fqn(target))
                 elif "EACCES" in str(e):
-                    raise RemoteIOError("Directory not empty: %s" % target)
+                    raise RemoteIOError("Directory not empty: %s" % self._fqn(target))
                 else:
                     raise e
             else:
@@ -387,7 +387,7 @@ class MpFileExplorer(Pyboard):
             else:
                 raise e
 
-    def _put_file(self, src, dst) -> None:
+    def _put_file(self, src, dst, verbose=False) -> None:
         """
         upload local file to remote
         Args:
@@ -398,7 +398,7 @@ class MpFileExplorer(Pyboard):
             None
 
         """
-        cache_value = self.md5_varifier.varify_sign(src, self._fqn(dst))
+        cache_value = self.md5_varifier.varify_sign(src, self._fqn(dst), verbose=verbose)
         if cache_value:
             f = open(src, "rb")
             data = f.read()
@@ -411,7 +411,7 @@ class MpFileExplorer(Pyboard):
             self._do_write_remote(self.md5_varifier.cache_file, cache_value)
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
-    def put(self, src: str, dst: str):
+    def put(self, src: str, dst: str, verbose=False):
         """
         upload local file/folder to reomte
         Args:
@@ -425,7 +425,7 @@ class MpFileExplorer(Pyboard):
         if os.path.isdir(src):
             self.md(dst, varify=False)
         elif os.path.isfile(src):
-            self._put_file(src, dst)
+            self._put_file(src, dst, verbose=verbose)
 
     def _do_read_remote(self, dst: str) -> bytes:
         """
@@ -634,8 +634,7 @@ class MpFileExplorer(Pyboard):
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def md(self, target, varify=True):
-        print(f'create dir {self._fqn(target)}')
-        logging.info(f'mkdir {target}')
+        logging.info(f'mkdir {self._fqn(target)}')
         parts = Path(target).parts
         if parts[0] == '\\':
             parts = parts[1:]
@@ -650,10 +649,10 @@ class MpFileExplorer(Pyboard):
                 self.eval("os.mkdir('%s')" % self._fqn(target))
 
         except PyboardError as e:
-            if _was_file_not_existing(e):
+            if "EEXIST" in str(e):
+                pass
+            elif _was_file_not_existing(e):
                 raise RemoteIOError("Invalid directory name: %s" % target)
-            elif "EEXIST" in str(e):
-                raise RemoteIOError("File or directory exists: %s" % target)
             else:
                 raise e
 
@@ -759,11 +758,11 @@ class MpFileExplorerCaching(MpFileExplorer):
 
         return files
 
-    def put(self, src, dst):
+    def put(self, src, dst, verbose=True):
         logging.info(f'src: {src}')
         logging.info(f'dst: {dst}')
 
-        MpFileExplorer.put(self, src, dst)
+        MpFileExplorer.put(self, src, dst, verbose=verbose)
 
         self.__update_cache(dst, 'add', 'file')
 
@@ -814,3 +813,23 @@ class MpFileExplorerCaching(MpFileExplorer):
         except Exception as e:
             logging.error(e)
             raise e
+
+    def synchronize(self, local_dir_path, remote_dir_path):
+        """
+        同步本地文件夹和开发板上文件夹
+        Args:
+            local_dir_path:
+            remote_dir_path:
+
+        Returns:
+
+        """
+        remote_path_suffix = f'{self.dir}{remote_dir_path}' if self.dir.endswith('/') \
+            else f'{self.dir}/{remote_dir_path}'
+        local_files = Path(local_dir_path).rglob('*')
+        remote_files = self.md5_varifier.get_filename_by_suffix(remote_path_suffix)
+        relative_files_local = [file.relative_to(local_dir_path) for file in local_files if file.is_file()]
+        relative_files_remote = {Path(file).relative_to(remote_path_suffix):file for file in remote_files}
+        for remote_file in relative_files_remote:
+            if remote_file not in relative_files_local:
+                self.rm(relative_files_remote[remote_file])
