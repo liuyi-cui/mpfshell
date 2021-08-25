@@ -16,12 +16,12 @@ requirements
 
 #### 主要库
 
-| 库名称 | 用途             | 来源     |
-| ------ | ---------------- | -------- |
-| cmd    | 命令行工具       | 标准库   |
-| serial | 串口连接工具     | 第三方库 |
-| Term   | repl模块         | 自定义   |
-| Token  | 解析命令输入参数 | 自定义   |
+| 库名称   | 用途             | 来源     |
+| -------- | ---------------- | -------- |
+| cmd      | 命令行工具       | 标准库   |
+| pyserial | 串口连接工具     | 第三方库 |
+| Term     | repl模块         | 自定义   |
+| Token    | 解析命令输入参数 | 自定义   |
 
 #### 目录
 
@@ -243,19 +243,19 @@ input ' open COM15 ' and enter connect your board.
 
 > 对本地当前目录下的文件(夹)设定匹配规则，符合匹配规则的即进行**put**操作。
 >
-> 格式为：`mput 正则表达式`
+> 格式为：`mput 正则表达式 [本地工作路径] [开发板存储路径]`
 
 ##### 16.get
 
 > 下载开发板当前目录下文件(夹)到本地当前目录
 >
-> 格式为：`get 文件(夹)名称`
+> 格式为：`get 文件(夹)名称 [本地存储文件(夹)名] `
 
 ##### 17.mget
 
 > 对开发板当前目录下的文件(夹)设定匹配规则，符合匹配规则的即进行**get**操作。
 >
-> 格式为：`mget 正则表达式`
+> 格式为：`mget 正则表达式 [本地存储文件夹] `
 
 ##### 18.rm
 
@@ -298,10 +298,10 @@ input ' open COM15 ' and enter connect your board.
 
 > 将输入在python环境中执行
 >
-> 格式为 ：`exec(命令)`
+> 格式为 ：`exec 命令`
 >
 > ```python
-> mpfs [/Once]> exec(print(12))
+> mpfs [/Once]> exec print(12)
 > 12
 > ```
 
@@ -322,13 +322,19 @@ input ' open COM15 ' and enter connect your board.
 
 > **put**和**execfile**的组合
 >
-> 格式为：`runfile 文件名`
+> 格式同`put`：`runfile 文件名 [本地工作路径] [开发板存储路径] ` 
 
 ##### 26.lexecfile
 
 > 执行本地目录下的.py脚本。同**runfile**命令不同的是，该命令会进入**repl**模式
 >
-> 格式为：`lexecfile 文件名`
+> 格式同`put`：`lexecfile 文件名 [本地工作路径] [开发板存储路径]`
+
+##### 27.synchronize
+
+> 同步本地与开发板上的文件夹
+>
+> 格式同`put`: `synchronize 文件夹名 [本地工作路径] [开发板存储路径]`
 
 
 
