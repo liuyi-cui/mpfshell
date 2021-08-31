@@ -45,6 +45,7 @@ from pyboard import PyboardError
 from conbase import ConError
 from tokenizer import Tokenizer
 from utility.file_util import get_file_size
+from utility.utils import trim_code_block
 
 
 class MpFileShell(cmd.Cmd):
@@ -225,6 +226,33 @@ class MpFileShell(cmd.Cmd):
                 if not lfile_name.startswith(os.getcwd()):
                     lfile_name = os.path.join(os.getcwd(), lfile_name)
             return lfile_name, work_path, rfile_name
+
+    def onecmd(self, line):
+        """Interpret the argument as though it had been typed in response
+        to the prompt.
+
+        This may be overridden, but should not normally need to be;
+        see the precmd() and postcmd() methods for useful execution hooks.
+        The return value is a flag indicating whether interpretation of
+        commands by the interpreter should stop.
+
+        """
+        cmd, arg, line = self.parseline(line)
+        if not line:
+            return self.emptyline()
+        if cmd is None:
+            return self.default(line)
+        # self.lastcmd = line
+        if line == 'EOF' :
+            self.lastcmd = ''
+        if cmd == '':
+            return self.default(line)
+        else:
+            try:
+                func = getattr(self, 'do_' + cmd)
+            except AttributeError:
+                return self.default(line)
+            return func(arg)
 
     def all_serial(self):
         import serial.tools.list_ports
@@ -806,9 +834,19 @@ class MpFileShell(cmd.Cmd):
         if not len(args):
             self.__error("Missing argument: <Python CODE>")
         elif self.__is_open():
+            # file_path = 'remote/hello_local.py'
+            # with open(file_path, 'r') as fp:
+            #     args = fp.read()
+            # args =  exec def hello(name='Li Lei'):\n    print('hello %s' % name)\n\n\nif __name__ == "__main__":\n    hello()\n
+            print(repr(args))
+            ret = trim_code_block(args)
+            ret = ret.replace('\\n', '\n')
+            code_block = ret + '\r\nimport time'
+            code_block += '\r\ntime.sleep(0.1)'
+
 
             try:
-                self.fe.exec_raw_no_follow(args + "\n")
+                self.fe.exec_raw_no_follow(code_block + "\n")
                 ret = self.fe.follow(1, data_consumer)
 
                 if len(ret[-1]):
