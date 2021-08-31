@@ -834,11 +834,6 @@ class MpFileShell(cmd.Cmd):
         if not len(args):
             self.__error("Missing argument: <Python CODE>")
         elif self.__is_open():
-            # file_path = 'remote/hello_local.py'
-            # with open(file_path, 'r') as fp:
-            #     args = fp.read()
-            # args =  exec def hello(name='Li Lei'):\n    print('hello %s' % name)\n\n\nif __name__ == "__main__":\n    hello()\n
-            print(repr(args))
             ret = trim_code_block(args)
             ret = ret.replace('\\n', '\n')
             code_block = ret + '\r\nimport time'
