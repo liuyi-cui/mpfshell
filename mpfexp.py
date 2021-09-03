@@ -326,11 +326,13 @@ class MpFileExplorer(Pyboard):
             # 1st try to delete it as a file
             self.eval("os.remove('%s')" % (self._fqn(target)))
         except PyboardError as e:
+            logging.error(f'rm error 1: {e}')
             try:
                 # 2nd see if it is empty dir
                 self.eval("os.rmdir('%s')" % (self._fqn(target)))
             except PyboardError as e:
                 # 3rd report error if nor successful
+                logging.error(f'rm error 2: {e}')
                 if _was_file_not_existing(e):
                     if self.sysname == "WiPy":
                         raise RemoteIOError("No such file or directory or directory not empty: %s" % target)

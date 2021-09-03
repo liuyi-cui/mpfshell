@@ -785,7 +785,9 @@ class MpFileShell(cmd.Cmd):
             else:
                 return
 
-        command = f'mpy {args}'
+        cur_dir = self.fe.dir
+        file_path = self.fe.dir + '/' + args
+        command = f'mpy {file_path}'
         try:
             command_data = self.fe.exec_command_in_shell(command)
             command_data = command_data.decode('utf-8')
@@ -797,6 +799,8 @@ class MpFileShell(cmd.Cmd):
             logging.error(e)
             print(e)
         self.__reconnect()
+        self.fe.cd(cur_dir)
+        self.__set_prompt_path()
 
     def do_lef(self, args):
         self.do_lexecfile(args)
@@ -861,9 +865,6 @@ class MpFileShell(cmd.Cmd):
         """repl(r)
         Enter Micropython REPL.
         """
-
-        import serial
-
         ver = serial.VERSION.split(".")
 
         if int(ver[0]) < 2 or (int(ver[0]) == 2 and int(ver[1]) < 7):
@@ -871,6 +872,7 @@ class MpFileShell(cmd.Cmd):
             return
 
         if self.__is_open():
+            cur_dir = self.fe.dir
 
             if self.repl is None:
 
@@ -909,6 +911,8 @@ class MpFileShell(cmd.Cmd):
             self.repl.console.cleanup()
 
             self.fe.setup()
+            self.fe.cd(cur_dir)
+            self.__set_prompt_path()
             self.__update_state(state='mpfshell')
             print("")
 
@@ -1026,7 +1030,7 @@ def main():
     if args.logfile is not None:
         logging.basicConfig(format=format, filename=args.logfile, level=args.loglevel)
     else:
-        logging.basicConfig(filename=init_log_path(), format=format, level=logging.DEBUG)
+        logging.basicConfig(filename=init_log_path(), format=format, level=logging.INFO)
 
     logging.info('Micropython File Shell v%s started' % version.FULL)
     logging.info('Running on Python %d.%d using PySerial %s' \
