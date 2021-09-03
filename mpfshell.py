@@ -44,7 +44,7 @@ from mpfexp import RemoteIOError
 from pyboard import PyboardError
 from conbase import ConError
 from tokenizer import Tokenizer
-from utility.file_util import get_file_size
+from utility.file_util import get_file_size, init_log_path
 from utility.utils import trim_code_block
 
 
@@ -354,7 +354,7 @@ class MpFileShell(cmd.Cmd):
 
         if self.__is_open():
             try:
-                files = self.fe.ls(add_details=True)
+                files = list(self.fe.ls(add_details=True))
                 files.sort(key=self.__sort_files)
 
                 if self.fe.pwd() != "/":
@@ -1026,7 +1026,7 @@ def main():
     if args.logfile is not None:
         logging.basicConfig(format=format, filename=args.logfile, level=args.loglevel)
     else:
-        logging.basicConfig(filename="log/mpfshell.log", format=format, level=logging.INFO)
+        logging.basicConfig(filename=init_log_path(), format=format, level=logging.DEBUG)
 
     logging.info('Micropython File Shell v%s started' % version.FULL)
     logging.info('Running on Python %d.%d using PySerial %s' \

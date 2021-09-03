@@ -230,7 +230,7 @@ class MpFileExplorer(Pyboard):
     def ls(self, add_files=True, add_dirs=True, add_details=False):
         logging.info(f'ls {self.dir}')
 
-        files = []
+        files = set()
 
         try:
 
@@ -247,25 +247,30 @@ class MpFileExplorer(Pyboard):
                         # if it is a dir, it could be listed with "os.listdir"
                         ret_inner_tmp = self.__list_dir(f"{self.dir}/{f}")  # os/Path的拼接都不行
                         if ret_inner_tmp is None:
-                            files.append((f, 'F'))
+                            files.add((f, 'F'))
                         else:
                             ret_inner = ast.literal_eval(ret_inner_tmp.decode('utf-8'))
                             if len(ret_inner) > 0:
-                                files.append((f, 'D'))
+                                files.add((f, 'D'))
                             else:
-                                files.append((f, 'F'))
+                                files.add((f, 'F'))
 
                     except PyboardError as e:
 
                         if _was_file_not_existing(e):
                             # this was not a dir
-                            if self.sysname == "WiPy" and self.dir == "/":
+                            if 'EBADF' or 'ENOTDIR' in str(e):
+                                if add_details:
+                                    files.add((f, 'F'))
+                                else:
+                                    files.add(f)
+                            elif self.sysname == "WiPy" and self.dir == "/":
                                 # for the WiPy, assume that all entries in the root of th FS
                                 # are mount-points, and thus treat them as directories
                                 if add_details:
-                                    files.append((f, 'D'))
+                                    files.add((f, 'D'))
                                 else:
-                                    files.append(f)
+                                    files.add(f)
                         else:
                             raise e
 
@@ -279,11 +284,16 @@ class MpFileExplorer(Pyboard):
 
                     except PyboardError as e:
 
-                        if _was_file_not_existing(e):
+                        if 'EBADF' or 'ENOTDIR' in str(e):
                             if add_details:
-                                files.append((f, 'F'))
+                                files.add((f, 'F'))
                             else:
-                                files.append(f)
+                                files.add(f)
+                        elif _was_file_not_existing(e):
+                            if add_details:
+                                files.add((f, 'F'))
+                            else:
+                                files.add(f)
                         else:
                             raise e
 
@@ -677,6 +687,7 @@ class MpFileExplorerCaching(MpFileExplorer):
 
     def __cache(self, path, data):
 
+        data = list(set(data))
         logging.debug("caching '%s': %s" % (path, data))
         self.cache[path] = data
 
@@ -732,23 +743,23 @@ class MpFileExplorerCaching(MpFileExplorer):
 
         if hit is not None:
 
-            files = []
+            files = set()
 
             if add_dirs:
                 for f in hit:
                     if f[1] == 'D':
                         if add_details:
-                            files.append(f)
+                            files.add(f)
                         else:
-                            files.append(f[0])
+                            files.add(f[0])
 
             if add_files:
                 for f in hit:
                     if f[1] == 'F':
                         if add_details:
-                            files.append(f)
+                            files.add(f)
                         else:
-                            files.append(f[0])
+                            files.add(f[0])
 
             return files
 
@@ -778,8 +789,7 @@ class MpFileExplorerCaching(MpFileExplorer):
 
     def rmrf(self, target, confirm=True):
         """remove directories and their contents recursively"""
-        content = f'Warnning: \nYou are deleting {target} irreversibly, ' \
-                  'are you sure you want to do this'
+        content = f'Warnning: \nDelete {target}, Y/N:'
         if confirm:
             if_do = repeat_inquiry(content)
             if not if_do:

@@ -3,6 +3,13 @@
 import binascii
 import hashlib
 import logging
+import os
+
+
+def init_log_path(file_path='log'):
+    file_name = 'mpfshell.log'
+    os.makedirs(file_path, exist_ok=True)
+    return os.path.join(file_path, file_name)
 
 
 class MD5Varifier:
