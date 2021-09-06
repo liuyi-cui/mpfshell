@@ -96,6 +96,7 @@ class MpFileExplorer(Pyboard):
         self.sysname = None
         self.setup()
         self._init_md5_varify()
+        self.__retry_get_list = []
 
     def __del__(self):
 
@@ -561,6 +562,13 @@ class MpFileExplorer(Pyboard):
             if not Path(dst).parent.exists():
                 self.__mkdir_local(str(Path(dst).parent))
             with open(dst, 'wb') as fp:
+                if 'total' in ret.decode('utf-8'):  # 十六进制表示的文件不应该存在total。找到total表示失败(内存溢出)
+                    self.__retry_get_list.append(src)
+                    print('-' * 30)
+                    print(f'** Warning: {src} download failed, please download again later')
+                    print('-' * 30)
+                    return
+                # logging.info(ret)
                 fp.write(binascii.unhexlify(ret))
                 print(f'download {src} success')
 
@@ -582,6 +590,15 @@ class MpFileExplorer(Pyboard):
 
         except sre_constants.error as e:
             raise RemoteIOError("Error in regular expression: %s" % e)
+        else:
+            if self.__retry_get_list:
+                print()
+                print('** Warning: There are some file download failed, please try again.')
+                print(f'{"-" * 10}download failed list{"-" * 10}')
+                for f in self.__retry_get_list:
+                    print(f'  {f}')
+                print(f'{"-" * 10}download failed list{"-" * 10}')
+            self.__retry_get_list = []
 
     @retry(PyboardError, tries=MAX_TRIES, delay=1, backoff=2, logger=logging.root)
     def gets(self, src):
