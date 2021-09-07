@@ -137,12 +137,11 @@ class MpFileShell(cmd.Cmd):
         except Exception as e:
             print(e)
 
-        if reconnect and self.__is_open() == False:
+        if reconnect and self.__is_open() is False:
             time.sleep(3)
             self.__connect(None, reconnect=reconnect)
 
     def __reconnect(self):
-        import time
         for a in range(3):
             self.__connect(None, reconnect=True)
             if self.__is_open():
@@ -838,10 +837,12 @@ class MpFileShell(cmd.Cmd):
         if not len(args):
             self.__error("Missing argument: <Python CODE>")
         elif self.__is_open():
+            logging.info(f'get exec block {args}')
             ret = trim_code_block(args)
             ret = ret.replace('\\n', '\n')
             code_block = ret + '\r\nimport time'
             code_block += '\r\ntime.sleep(0.1)'
+            logging.info(f'The formatted paragraph is {code_block}')
 
 
             try:
