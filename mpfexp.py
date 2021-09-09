@@ -188,7 +188,7 @@ class MpFileExplorer(Pyboard):
         board_model = self.get_board_info()
         logging.info(f'Get board model is {board_model}')
         self.exit_raw_repl()
-        if board_model == 'stm32l401':
+        if board_model.startswith('stm32l4'):
             self._os_lib = 'uos'
             logging.info('Set os lib is uos on board')
         elif board_model == 'ESP8266':
@@ -392,12 +392,13 @@ class MpFileExplorer(Pyboard):
 
         except PyboardError as e:
             if _was_file_not_existing(e):
-                logging.warning("Failed to create file: %s" % dst)
-                print("Failed to create file: %s" % dst)
+                logging.warning("Failed to create file: %s" % dst, e)
+                print("Failed to create file: %s" % dst, e)
             elif "EACCES" in str(e):
                 logging.warning("Existing directory: %s" % dst)
                 print("Existing directory: %s" % dst)
             else:
+                logging.error(e)
                 raise e
 
     def _put_file(self, src, dst, verbose=False) -> None:
@@ -456,14 +457,19 @@ class MpFileExplorer(Pyboard):
             self.exec_("f = open('%s', 'a')" % self._fqn(dst))
             self.exec_("f.close()")
             self.exec_("f = open('%s', 'rb')" % self._fqn(dst))
-            ret = self.exec_(
-                "while True:\r\n"
-                "  c = ubinascii.hexlify(f.read(%s))\r\n"
-                "  if not len(c):\r\n"
-                "    break\r\n"
-                "  sys.stdout.write(c)\r\n" % self.BIN_CHUNK_SIZE
-            )
-            self.exec_("f.close()")
+            try:
+                ret = self.exec_(
+                    "while True:\r\n"
+                    "  c = ubinascii.hexlify(f.read(%s))\r\n"
+                    "  if not len(c):\r\n"
+                    "    break\r\n"
+                    "  sys.stdout.write(c)\r\n" % self.BIN_CHUNK_SIZE
+                )
+            except Exception as e:
+                logging.error(f'exec failed', exc_info=e)
+                raise e
+            finally:
+                self.exec_("f.close()")
 
         except PyboardError as e:
             if _was_file_not_existing(e):

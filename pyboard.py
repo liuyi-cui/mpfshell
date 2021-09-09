@@ -32,6 +32,8 @@ class Pyboard:
         logging.info('Init Pyboard')
 
         self.con = conbase
+        self._BUFFER_SIZE = 32  # Amount of data to read or write to the serial port at a time.
+        # This is kept small because small chips and USB to serial bridges usually have very small buffers
 
     def close(self):
 
@@ -172,13 +174,14 @@ class Pyboard:
 
         # wait for normal output
         data = self.read_until(1, b'\x04', timeout=timeout, data_consumer=data_consumer)
-        # print(data)
+        logging.info(f'data: {data}')
         if not data.endswith(b'\x04') and not data.endswith(b'>'):
             raise PyboardError('timeout waiting for first EOF reception')
         data = data[:-1]
 
         # wait for error output
         data_err = self.read_until(1, b'\x04', timeout=timeout)
+        logging.info(f'data_err: {data_err}')
         # print(data_err)
         if not data_err.endswith(b'\x04') and not data.endswith(b'>'):
             raise PyboardError('timeout waiting for second EOF reception')
@@ -188,6 +191,7 @@ class Pyboard:
         return data, data_err
 
     def exec_raw_no_follow(self, command):
+        logging.info(f'exec command: {command}')
 
         if isinstance(command, bytes):
             command_bytes = command
@@ -198,19 +202,23 @@ class Pyboard:
         data = self.read_until(1, b'>')
 
         if not data.endswith(b'>'):
+            logging.error(f'data is not endswith >: {data}')
             raise PyboardError('could not enter raw repl, auto try again.')
 
         # write command
-        for i in range(0, len(command_bytes), 256):
-            self.con.write(command_bytes[i:min(i + 256, len(command_bytes))])
+        for i in range(0, len(command_bytes), 32):
+            self.con.write(command_bytes[i:min(i + 32, len(command_bytes))])
             time.sleep(0.01)
         self.con.write(b'\x04')
 
         # check if we could exec command
         data = self.con.read(2)
-        # print(data)
         if b'OK' not in data:
+            logging.error(f'OK is not in data: {data}')
+            data = self.con.read(self.con.inWaiting())
+            logging.error(f'OK is not in data: {data}')
             raise PyboardError('could not exec command, auto try again.')
+        logging.info('exec command success')
 
     def exec_raw(self, command, timeout=4, data_consumer=None):
         self.exec_raw_no_follow(command)
