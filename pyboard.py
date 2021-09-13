@@ -206,8 +206,8 @@ class Pyboard:
             raise PyboardError('could not enter raw repl, auto try again.')
 
         # write command
-        for i in range(0, len(command_bytes), 32):
-            self.con.write(command_bytes[i:min(i + 32, len(command_bytes))])
+        for i in range(0, len(command_bytes), self._BUFFER_SIZE):
+            self.con.write(command_bytes[i:min(i + self._BUFFER_SIZE, len(command_bytes))])
             time.sleep(0.01)
         self.con.write(b'\x04')
 

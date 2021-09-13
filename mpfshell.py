@@ -523,6 +523,7 @@ class MpFileShell(cmd.Cmd):
                     if verbose:
                         print(f'[{num_cur}/{nums}] Writing file {relative_path}({file_size // 1024 + 1}kb)')
                     self.fe.put(str(file), remote_relative_path, verbose=not verbose)
+                    time.sleep(0.05)
                     num_cur += 1
                 if verbose:
                     print('Upload done')
@@ -846,8 +847,12 @@ class MpFileShell(cmd.Cmd):
             logging.info(f'get exec block {args}')
             ret = trim_code_block(args)
             ret = ret.replace('\\n', '\n')
-            code_block = ret + '\r\nimport time'
-            code_block += '\r\ntime.sleep(0.1)'
+            if self.fe._os_lib == 'uos':
+                code_block = ret + '\r\nimport utime'
+                code_block += '\r\nutime.sleep(0.1)'
+            else:
+                code_block = ret + '\r\nimport time'
+                code_block += '\r\ntime.sleep(0.1)'
             logging.info(f'The formatted paragraph is {code_block}')
 
 
@@ -909,7 +914,9 @@ class MpFileShell(cmd.Cmd):
 
             try:
                 if args != None:
+                    time.sleep(0.5)
                     self.fe.con.write(bytes(args, encoding="utf8"))
+                    time.sleep(0.5)
                 self.repl.join(True)
             except Exception as e:
                 # print(e)
@@ -993,6 +1000,9 @@ class MpFileShell(cmd.Cmd):
             except Exception as e:
                 print(e)
 
+    def do_sync(self, args):
+        self.do_synchronize(args)
+
     def do_synchronize(self, args):
         """
         同步目录
@@ -1019,7 +1029,7 @@ def main():
 
     parser.add_argument("--nocolor", help="disable color", action="store_true", default=False)
     parser.add_argument("--nocache", help="disable cache", action="store_true", default=False)
-    parser.add_argument("--nohelp", help="disable help", action="store_true", default=False)
+    parser.add_argument("--onhelp", help="show help", action="store_true", default=False)
 
     parser.add_argument("--logfile", help="write log to file", default=None)
     parser.add_argument("--loglevel", help="loglevel (CRITICAL, ERROR, WARNING, INFO, DEBUG)", default="INFO")
@@ -1043,7 +1053,7 @@ def main():
     logging.info('Running on Python %d.%d using PySerial %s' \
                  % (sys.version_info[0], sys.version_info[1], serial.VERSION))
 
-    mpfs = MpFileShell(not args.nocolor, not args.nocache, args.reset, args.nohelp)
+    mpfs = MpFileShell(not args.nocolor, not args.nocache, args.reset, args.onhelp)
 
     if args.open is not None:
         if args.board is None:

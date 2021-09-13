@@ -67,7 +67,7 @@ class RemoteIOError(IOError):
 
 class MpFileExplorer(Pyboard):
 
-    BIN_CHUNK_SIZE = 16 * 100
+    BIN_CHUNK_SIZE = 32
     MAX_TRIES = 3
 
     def __init__(self, constr, reset=False, os_lib='os'):
@@ -373,9 +373,8 @@ class MpFileExplorer(Pyboard):
 
         """
         logging.info(f"write data to {self._fqn(dst)}")
+        self.exec_("f = open('%s', 'wb')" % self._fqn(dst))
         try:
-
-            self.exec_("f = open('%s', 'wb')" % self._fqn(dst))
 
             file_size = len(data)
             while True:
@@ -388,7 +387,6 @@ class MpFileExplorer(Pyboard):
 
                 if verbose:
                     print("\ttransfer %d of %d" % (file_size - len(data), file_size))
-            self.exec_("f.close()")
 
         except PyboardError as e:
             if _was_file_not_existing(e):
@@ -400,6 +398,8 @@ class MpFileExplorer(Pyboard):
             else:
                 logging.error(e)
                 raise e
+        finally:
+            self.exec_("f.close()")
 
     def _put_file(self, src, dst, verbose=False) -> None:
         """
@@ -612,13 +612,18 @@ class MpFileExplorer(Pyboard):
         try:
 
             self.exec_("f = open('%s', 'rb')" % self._fqn(src))
-            ret = self.exec_(
-                "while True:\r\n"
-                "  c = ubinascii.hexlify(f.read(%s))\r\n"
-                "  if not len(c):\r\n"
-                "    break\r\n"
-                "  sys.stdout.write(c)\r\n" % self.BIN_CHUNK_SIZE
-            )
+            try:
+                ret = self.exec_(
+                    "while True:\r\n"
+                    "  c = ubinascii.hexlify(f.read(%s))\r\n"
+                    "  if not len(c):\r\n"
+                    "    break\r\n"
+                    "  sys.stdout.write(c)\r\n" % self.BIN_CHUNK_SIZE
+                )
+            except Exception as e:
+                logging.error(f'cat file error', exc_info=e)
+            finally:
+                self.exec_('f.close()')
 
         except PyboardError as e:
             if _was_file_not_existing(e):
@@ -684,7 +689,10 @@ class MpFileExplorer(Pyboard):
                 self.eval("os.mkdir('%s')" % self._fqn(target))
 
         except PyboardError as e:
+            logging.error(f'mkdir {self._fqn(target)} failed', exc_info=e)
             if "EEXIST" in str(e):
+                pass
+            elif 'mkdir ret error' in str(e):
                 pass
             elif _was_file_not_existing(e):
                 raise RemoteIOError("Invalid directory name: %s" % target)
