@@ -849,7 +849,7 @@ class MpFileShell(cmd.Cmd):
             ret = ret.replace('\\n', '\n')
             if self.fe._os_lib == 'uos':
                 code_block = ret + '\r\nimport utime'
-                code_block += '\r\nutime.sleep(0.1)'
+                code_block += '\r\nutime.sleep(1)'  # utime.sleep()不能传入非整数的参数
             else:
                 code_block = ret + '\r\nimport time'
                 code_block += '\r\ntime.sleep(0.1)'
