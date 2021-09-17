@@ -109,7 +109,7 @@ class MD5Varifier:
                 print(f' * update {file_path_remote}')
             return self._update_cache_file()
         else:
-            logging.info('The new signatures is same as the old, don`t updte')
+            logging.info('The new signatures is same as the old, don`t update')
             return False
 
     def rm_sign(self, file_path_remote) -> bytes:

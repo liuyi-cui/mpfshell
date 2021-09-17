@@ -884,7 +884,6 @@ class MpFileShell(cmd.Cmd):
             return
 
         if self.__is_open():
-            cur_dir = self.fe.dir
 
             if self.repl is None:
 
@@ -925,7 +924,6 @@ class MpFileShell(cmd.Cmd):
             self.repl.console.cleanup()
 
             self.fe.setup()
-            self.fe.cd(cur_dir)
             self.__set_prompt_path()
             self.__update_state(state='mpfshell')
             print("")

@@ -31,7 +31,7 @@ requirements
 |-- conserial.py  # 串口连接类
 |-- contelnet.py
 |-- conwebsock.py
-|-- mpfexp.py  # 串口操作类1(基于pyboard.py)
+|-- mpfexp.py  # 串口操作类1
 |-- mpfshell.py  # 入口
 |-- pyboard.py  # 串口操作类2
 |-- README.md
@@ -43,7 +43,7 @@ requirements
 |-- log
 |   |-- mpfshell.log  # 日志
 |-- utility
-|   |-- file_util.py  # 操作文件辅助类(签名相关)
+|   |-- file_util.py  # 操作文件辅助类
 |   |-- utils.py  # 辅助方法和类
 |   |-- __init__.py
 ```
@@ -334,7 +334,7 @@ input ' open COM15 ' and enter connect your board.
 >
 > 格式同`put`：`lexecfile 文件名 [本地工作路径] [开发板存储路径]`
 
-##### 27.synchronize
+##### 27.synchronize | sync
 
 > 同步本地与开发板上的文件夹
 >
