@@ -221,7 +221,7 @@ class MpFileExplorer(Pyboard):
             if self._os_lib == 'os':
                 res = self.eval("os.listdir('%s')" % path_)
             elif self._os_lib == 'uos':
-                res = self.eval(f"[i[0] for i in uos.ilistdir('{path_}')]")
+                res = self.eval(f"[i[0] for i in uos.ilistdir('{path_}')]", gc=True)
             return res
         except PyboardError as e:
             logging.error(e)
@@ -373,7 +373,7 @@ class MpFileExplorer(Pyboard):
 
         """
         logging.info(f"write data to {self._fqn(dst)}")
-        self.exec_("f = open('%s', 'wb')" % self._fqn(dst))
+        self.exec_("f = open('%s', 'wb')" % self._fqn(dst), gc=True)
         try:
 
             file_size = len(data)
@@ -456,7 +456,7 @@ class MpFileExplorer(Pyboard):
 
             self.exec_("f = open('%s', 'a')" % self._fqn(dst))
             self.exec_("f.close()")
-            self.exec_("f = open('%s', 'rb')" % self._fqn(dst))
+            self.exec_("f = open('%s', 'rb')" % self._fqn(dst), gc=True)
             try:
                 ret = self.exec_(
                     "while True:\r\n"
@@ -611,7 +611,7 @@ class MpFileExplorer(Pyboard):
 
         try:
 
-            self.exec_("f = open('%s', 'rb')" % self._fqn(src))
+            self.exec_("f = open('%s', 'rb')" % self._fqn(src), gc=True)
             try:
                 ret = self.exec_(
                     "while True:\r\n"

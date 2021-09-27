@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*_
 #!/usr/bin/env python
 
 """
@@ -39,6 +40,26 @@ class Pyboard:
 
         if self.con is not None:
             self.con.close()
+
+    def __exec_gc_collect(self):
+        """内存回收"""
+        command = b'gc.collect()'
+        logging.info(f'exec command: {command}')
+
+        # check we have a prompt
+        data = self.read_until(1, b'>')
+
+        if not data.endswith(b'>'):
+            logging.error(f'data is not endswith >: {data}')
+            raise PyboardError('could not enter raw repl, auto try again.')
+
+        # write command
+        for i in range(0, len(command), self._BUFFER_SIZE):
+            self.con.write(command[i:min(i + self._BUFFER_SIZE, len(command))])
+            time.sleep(0.01)
+        self.con.write(b'\x04')
+        # TODO 是否需要验证回收成功
+        logging.info('gc collect success')
 
     def read_until(self, min_num_bytes, ending, timeout=10, data_consumer=None, max_recv=sys.maxsize):
 
@@ -220,20 +241,23 @@ class Pyboard:
             raise PyboardError('could not exec command, auto try again.')
         logging.info('exec command success')
 
-    def exec_raw(self, command, timeout=4, data_consumer=None):
+    def exec_raw(self, command, timeout=4, data_consumer=None, gc=False):
+        # 总是执行一次内存回收
+        if gc:
+            self.__exec_gc_collect()
         self.exec_raw_no_follow(command)
         return self.follow(timeout, data_consumer)
 
-    def eval(self, expression):
-        ret = self.exec_('print({})'.format(expression))
+    def eval(self, expression, gc=False):
+        ret = self.exec_('print({})'.format(expression), gc=gc)
         if 'uos' in expression:
             ret = ret.decode('utf-8').replace('\r\n0', '').encode('utf-8')
         ret = ret.strip()
         return ret
 
-    def exec_(self, command):
+    def exec_(self, command, gc=False):
         logging.debug(f'execute command {command}')
-        ret, ret_err = self.exec_raw(command)
+        ret, ret_err = self.exec_raw(command, gc=gc)
         if ret_err:
             raise PyboardError('exception', ret, ret_err)
         return ret
