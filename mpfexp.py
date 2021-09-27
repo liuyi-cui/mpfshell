@@ -126,7 +126,9 @@ class MpFileExplorer(Pyboard):
             else:
                 baudrate = 115200
 
+            logging.info(f'port {port}, baudrate {baudrate}')
             con = ConSerial(port=port, baudrate=baudrate, reset=self.reset)
+            logging.info('connected baoard success')
 
         elif proto.strip(" ") == "tn":
 

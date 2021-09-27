@@ -181,7 +181,11 @@ class MpFileShell(cmd.Cmd):
         return None
 
     def __update_state(self, file_name=STATE_FILE, state='mpfshell'):
-        state = {self.port: state}
+        params =self.port.split(',')
+        if len(params) > 1:
+            state = {params[0]: state}
+        else:
+            state = {self.port: state}
         if os.path.exists(file_name):
             with open(file_name, 'r') as fp:
                 state_intact = json.load(fp)
