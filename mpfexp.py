@@ -188,7 +188,7 @@ class MpFileExplorer(Pyboard):
         board_model = self.get_board_info()
         logging.info(f'Get board model is {board_model}')
         self.exit_raw_repl()
-        if board_model.startswith('stm32l4'):
+        if board_model.startswith('stm32'):
             self._os_lib = 'uos'
             logging.info('Set os lib is uos on board')
         elif board_model == 'ESP8266':
@@ -196,10 +196,10 @@ class MpFileExplorer(Pyboard):
 
         self.enter_raw_repl()
         if self._os_lib == 'uos':
-            self.exec_("import sys, ubinascii, uos")
+            self.exec_("import sys, ubinascii, uos, gc")
             self.dir = posixpath.join("/", self.eval("uos.system('pwd')").decode('utf8'))
         else:
-            self.exec_("import os, sys, ubinascii")
+            self.exec_("import os, sys, ubinascii, gc")
             # New version mounts files on /flash so lets set dir based on where we are in
             # filesystem.
             # Using the "path.join" to make sure we get "/" if "os.getcwd" returns "".
