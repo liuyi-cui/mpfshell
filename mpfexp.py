@@ -384,7 +384,7 @@ class MpFileExplorer(Pyboard):
                 if not len(c):
                     break
 
-                self.exec_("f.write(ubinascii.unhexlify('%s'))" % c.decode('utf-8'))
+                self.exec_("f.write(ubinascii.unhexlify('%s'))" % c.decode('utf-8'), gc=True)
                 data = data[self.BIN_CHUNK_SIZE:]
 
                 if verbose:
