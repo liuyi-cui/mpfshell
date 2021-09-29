@@ -186,6 +186,8 @@ class MpFileExplorer(Pyboard):
 
     def setup(self):
         logging.info('Set up')
+        self._enter_mpy()
+        logging.info('enter mpy mode')
 
         board_model = self.get_board_info()
         logging.info(f'Get board model is {board_model}')
