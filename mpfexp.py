@@ -192,7 +192,7 @@ class MpFileExplorer(Pyboard):
         board_model = self.get_board_info()
         if board_model is None:
             print('Cannot connect to device')
-            exit(0)
+            raise TimeoutError('Cannot connect to device')
         logging.info(f'Get board model is {board_model}')
         self.exit_raw_repl()
         if board_model.startswith('stm32'):

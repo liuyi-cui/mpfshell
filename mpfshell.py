@@ -134,6 +134,8 @@ class MpFileShell(cmd.Cmd):
         except AttributeError as e:
             logging.error(e)
             self.__error("Failed to open: %s" % port)
+        except TimeoutError as e:
+            self.__error("Failed to open: %s" % port)
         except Exception as e:
             print(e)
 
