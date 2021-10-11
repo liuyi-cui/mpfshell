@@ -137,7 +137,9 @@ class Pyboard:
             if not self.con.inWaiting():  # 缓冲区没有数据
                 return None
             data = self.read_until(1, b'>>>', timeout=5, max_recv=8000)
-            if not data.endswith(b'>>>'):
+            if b'mpy: command not found' in data:
+                raise TimeoutError('There is no micropython on board')
+            elif not data.endswith(b'>>>'):
                 # print(data)
                 print('Could not enter raw repl, Press Reset key after 10 seconds.')
             else:

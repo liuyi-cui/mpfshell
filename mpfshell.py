@@ -125,6 +125,7 @@ class MpFileShell(cmd.Cmd):
             if not reconnect:
                 print("Connected to %s" % self.fe.sysname)
             self.__set_prompt_path()
+
         except PyboardError as e:
             logging.error(e)
             self.__error(str(e))
@@ -135,7 +136,7 @@ class MpFileShell(cmd.Cmd):
             logging.error(e)
             self.__error("Failed to open: %s" % port)
         except TimeoutError as e:
-            self.__error("Failed to open: %s" % port)
+            self.__error("Failed to open: %s, %s" % (port, e))
         except Exception as e:
             print(e)
 
