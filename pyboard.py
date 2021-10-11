@@ -134,6 +134,8 @@ class Pyboard:
             self.con.write(b'\x02\x02\x02\x02')
             time.sleep(0.1)
 
+            if not self.con.inWaiting():  # 缓冲区没有数据
+                return None
             data = self.read_until(1, b'>>>', timeout=5, max_recv=8000)
             if not data.endswith(b'>>>'):
                 # print(data)

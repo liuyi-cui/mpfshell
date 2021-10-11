@@ -128,7 +128,7 @@ class MpFileExplorer(Pyboard):
 
             logging.info(f'port {port}, baudrate {baudrate}')
             con = ConSerial(port=port, baudrate=baudrate, reset=self.reset)
-            logging.info('connected baoard success')
+            logging.info('connected board success')
 
         elif proto.strip(" ") == "tn":
 
@@ -190,6 +190,9 @@ class MpFileExplorer(Pyboard):
         logging.info('enter mpy mode')
 
         board_model = self.get_board_info()
+        if board_model is None:
+            print('Cannot connect to device')
+            exit(0)
         logging.info(f'Get board model is {board_model}')
         self.exit_raw_repl()
         if board_model.startswith('stm32'):

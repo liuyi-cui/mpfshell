@@ -30,7 +30,7 @@ class MD5Varifier:
         Returns:
 
         """
-        if cache_data == b'' or cache_data == b'0d0a':
+        if cache_data == b'' or cache_data == b'0d0a':  # binascii.a2b_hex(cache_data.decode('utf-8))
             return
         file_info = binascii.a2b_hex(cache_data).decode('utf-8')  # 字符串
 
