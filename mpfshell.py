@@ -829,7 +829,7 @@ class MpFileShell(cmd.Cmd):
                 if put_args:
                     lfile_name, work_path, rfile_name = put_args
                     self._do_put(lfile_name, work_path, rfile_name)
-                    self.do_repl("exec(open('{0}').read())\r\n".format(rfile_name))
+                    self.do_repl(f"f=open('{rfile_name}')\r\nexec(f.read())\r\nf.close()\r\n")
 
             except IOError as e:
                 self.__error(str(e))
@@ -854,6 +854,7 @@ class MpFileShell(cmd.Cmd):
             logging.info(f'get exec block {args}')
             ret = trim_code_block(args)
             ret = ret.replace('\\n', '\n')
+            ret = ret.replace('!*#', '\\n')
             if self.fe._os_lib == 'uos':
                 code_block = ret + '\r\nimport utime'
                 code_block += '\r\nutime.sleep(1)'  # utime.sleep()不能传入非整数的参数
@@ -861,7 +862,6 @@ class MpFileShell(cmd.Cmd):
                 code_block = ret + '\r\nimport time'
                 code_block += '\r\ntime.sleep(0.1)'
             logging.info(f'The formatted paragraph is {repr(code_block)}')
-
 
             try:
                 self.fe.exec_raw_no_follow(code_block + "\n")
@@ -1052,7 +1052,7 @@ def main():
     if args.logfile is not None:
         logging.basicConfig(format=format, filename=args.logfile, level=args.loglevel)
     else:
-        logging.basicConfig(filename=init_log_path(), format=format, level=logging.DEBUG)
+        logging.basicConfig(filename=init_log_path(), format=format, level=logging.INFO)
 
     logging.info('Micropython File Shell v%s started' % version.FULL)
     logging.info('Running on Python %d.%d using PySerial %s' \
