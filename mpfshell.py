@@ -789,7 +789,7 @@ class MpFileShell(cmd.Cmd):
         if self.fe._exec_tool == 'repl':
             file_path = f'{cur_dir}/{args}'
             try:
-                self.do_repl("exec(open('{0}').read())\r\n".format(file_path))
+                self.do_repl(f"f=open('{file_path}')\r\nexec(f.read())\r\nf.close()\r\n")
             except Exception as e:
                 raise e
             else:
@@ -860,7 +860,7 @@ class MpFileShell(cmd.Cmd):
             else:
                 code_block = ret + '\r\nimport time'
                 code_block += '\r\ntime.sleep(0.1)'
-            logging.info(f'The formatted paragraph is {code_block}')
+            logging.info(f'The formatted paragraph is {repr(code_block)}')
 
 
             try:
@@ -1052,7 +1052,7 @@ def main():
     if args.logfile is not None:
         logging.basicConfig(format=format, filename=args.logfile, level=args.loglevel)
     else:
-        logging.basicConfig(filename=init_log_path(), format=format, level=logging.INFO)
+        logging.basicConfig(filename=init_log_path(), format=format, level=logging.DEBUG)
 
     logging.info('Micropython File Shell v%s started' % version.FULL)
     logging.info('Running on Python %d.%d using PySerial %s' \
