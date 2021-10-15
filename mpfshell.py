@@ -853,8 +853,8 @@ class MpFileShell(cmd.Cmd):
         elif self.__is_open():
             logging.info(f'get exec block {args}')
             ret = trim_code_block(args)
-            ret = ret.replace('\\n', '\n')
-            ret = ret.replace('!*#', '\\n')
+            ret = ret.replace('\\n', '\n')  # 代码间的换行不转义
+            ret = ret.replace('&0x0D', '\\n')  # 字符串内部的换行需要转义，替换符遵从studio约定
             if self.fe._os_lib == 'uos':
                 code_block = ret + '\r\nimport utime'
                 code_block += '\r\nutime.sleep(1)'  # utime.sleep()不能传入非整数的参数
