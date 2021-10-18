@@ -36,6 +36,7 @@ import re
 import time
 import json
 from pathlib import Path
+from serial import SerialException
 
 import version
 from mpfexp import MpFileExplorer
@@ -51,6 +52,7 @@ from utility.utils import trim_code_block
 class MpFileShell(cmd.Cmd):
 
     STATE_FILE = 'state_temp.json'
+    ERROR_ARGS = ("ClearCommError failed (PermissionError(13, '设备不识别此命令。', None, 22))",)  # 端口连接失败时
 
     def __init__(self, color=False, caching=False, reset=False, help=False):
         cmd.Cmd.__init__(self)
@@ -170,6 +172,15 @@ class MpFileShell(cmd.Cmd):
             self.__error("Not connected to device. Use 'open' first.")
             return False
 
+        try:
+            self.fe.con.inWaiting()
+        except SerialException as e:
+            if e.args == self.ERROR_ARGS:
+                self.__error("Not connected to device. Use 'open' first.")
+            else:
+                self.__error(str(e))
+            return False
+
         return True
 
     def __parse_file_names(self, args):
@@ -279,7 +290,6 @@ class MpFileShell(cmd.Cmd):
 
         if self.open_args:
             print("current open_args", self.open_args)
-
 
     def do_v(self, args):
         return self.do_view(args)
