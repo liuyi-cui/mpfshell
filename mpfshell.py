@@ -44,9 +44,10 @@ from mpfexp import MpFileExplorerCaching
 from mpfexp import RemoteIOError
 from pyboard import PyboardError
 from conbase import ConError
+from term import Term
 from tokenizer import Tokenizer
 from utility.file_util import get_file_size, init_log_path
-from utility.utils import trim_code_block
+from utility.utils import trim_code_block, update_state
 
 
 class MpFileShell(cmd.Cmd):
@@ -195,19 +196,7 @@ class MpFileShell(cmd.Cmd):
         return None
 
     def __update_state(self, file_name=STATE_FILE, state='mpfshell'):
-        params =self.port.split(',')
-        if len(params) > 1:
-            state = {params[0]: state}
-        else:
-            state = {self.port: state}
-        if os.path.exists(file_name):
-            with open(file_name, 'r') as fp:
-                state_intact = json.load(fp)
-            state_intact.update(state)
-        else:
-            state_intact = state
-        with open(file_name, 'w') as fp:
-            json.dump(state_intact, fp, indent=4)
+        update_state(self.port, Path(file_name), state=state)
 
     def __parse_put_args(self, args):
         if not len(args):
@@ -904,8 +893,7 @@ class MpFileShell(cmd.Cmd):
 
             if self.repl is None:
 
-                from term import Term
-                self.repl = Term(self.fe.con)
+                self.repl = Term(self.fe.con, self.port)
 
                 if platform.system() == "Windows":
                     self.repl.exit_character = chr(0x11)

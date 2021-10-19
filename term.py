@@ -1,4 +1,4 @@
-##
+# -*- coding: utf-8 -*-
 # The MIT License (MIT)
 #
 # Copyright (c) 2016 Stefan Wendler
@@ -22,8 +22,10 @@
 # THE SOFTWARE.
 ##
 
-
+import logging
 import serial
+
+from utility.utils import update_state, record_str
 
 if serial.VERSION.startswith("2."):
 
@@ -176,9 +178,10 @@ else:
 
         class Term(Miniterm):
                     
-            def __init__(self, serial_instance, echo=False, eol='crlf', filters=()):
+            def __init__(self, serial_instance, port, echo=False, eol='crlf', filters=()):
                 self.console = Console()
                 self.serial = serial_instance
+                self.port = port  # json内存储的端口号
                 self.echo = echo
                 self.raw = False
                 self.input_encoding = 'UTF-8'
@@ -193,5 +196,64 @@ else:
                 self.receiver_thread = None
                 self.rx_decoder = None
                 self.tx_decoder = None
+                self.__update_cur_str()
+
+            def __update_cur_str(self):  # 重置curr_str值
+                self.add_str = record_str()
+                self.curr_str = ''
+
+            def writer(self):
+                """\
+                Loop and copy console->serial until self.exit_character character is
+                found. When self.menu_character is found, interpret the next key
+                locally.
+                """
+                menu_active = False
+
+                try:
+                    while self.alive:
+                        try:
+                            c = self.console.getkey()
+                            if c == '\x04':  # CTRL+D, 回到sh
+                                logging.info(f'update {self.port}.state to shell')
+                                update_state(self.port, state='shell')
+                            elif c == '\x0a' and self.curr_str == 'mpy':  # mpy且回车
+                                logging.info(f'update {self.port}.state to repl')
+                                update_state(self.port, state='repl')
+                        except KeyboardInterrupt:
+                            c = '\x03'
+                        if not self.alive:
+                            break
+                        if menu_active:
+                            self.__update_cur_str()
+                            self.handle_menu_key(c)
+                            menu_active = False
+                        elif c == self.menu_character:
+                            self.__update_cur_str()
+                            menu_active = True  # next char will be for menu
+                        elif c == self.exit_character:
+                            self.__update_cur_str()
+                            self.stop()  # exit app
+                            break
+                        else:
+                            if c in ('m', 'p', 'y'):
+                                self.curr_str = self.add_str(c)  # 刷新curr_str
+                            else:
+                                self.__update_cur_str()
+                            # ~ if self.raw:
+                            text = c
+
+                            for transformation in self.tx_transformations:
+                                text = transformation.tx(text)
+                            self.serial.write(self.tx_encoder.encode(text))
+                            if self.echo:
+                                echo_text = c
+                                for transformation in self.tx_transformations:
+                                    echo_text = transformation.echo(echo_text)
+                                self.console.write(echo_text)
+                                print('')
+                except:
+                    self.alive = False
+                    raise
     else:
         Term = Miniterm
